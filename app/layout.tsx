@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ToastViewport } from '@/components/ToastViewport';
 
 export const metadata: Metadata = {
   title: 'MSU Activity 2026',
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="th">
       <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
         {children}
+        <ToastViewport />
       </body>
     </html>
   );
