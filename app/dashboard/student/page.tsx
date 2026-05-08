@@ -136,7 +136,7 @@ export default function StudentDashboardPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="mb-1 text-2xl font-bold text-gray-900">
-            แผงควบคุม - Dashobard
+            แผงควบคุม - Dashboard
           </h1>
           <p className="text-sm text-gray-500">
             สรุปการเข้าร่วมกิจกรรม + กิจกรรมที่สมัครไว้และผ่านมาแล้ว

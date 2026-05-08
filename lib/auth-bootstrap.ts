@@ -16,6 +16,15 @@ let inflight: Promise<void> | null = null;
 
 async function runBootstrap(): Promise<void> {
   try {
+    // ✦ short-circuit: ถ้า callback page เพิ่ง set state ครบแล้ว (token + user) ไม่ต้อง refresh ซ้ำ
+    //   ลด race condition ที่ทำให้หน้า redirect ค้าง — runBootstrap ที่รันคู่ขนานกับ navigation
+    //   เคยทำให้ user object ถูก overwrite ระหว่างที่ effect กำลังเด้งไปหน้า role-specific
+    const s = useAuthStore.getState();
+    if (s.accessToken && s.user) {
+      s.setBootstrapping(false);
+      return;
+    }
+
     const refreshRes = await api.post<{ access_token: string }>(
       '/api/auth/refresh',
     );

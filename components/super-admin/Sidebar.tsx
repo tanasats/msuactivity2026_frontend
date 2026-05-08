@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
   Tag,
+  Users,
   Wrench,
   X,
   type LucideIcon,
@@ -30,13 +31,13 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/super-admin', label: 'ภาพรวมระบบ', Icon: LayoutDashboard },
   {
     href: '/dashboard/super-admin/faculties',
-    label: 'คณะ',
+    label: 'คณะ/หน่วยงาน',
     Icon: GraduationCap,
     matchPrefix: '/dashboard/super-admin/faculties',
   },
   {
     href: '/dashboard/super-admin/organizations',
-    label: 'หน่วยงาน',
+    label: 'องค์กรจัดกิจกรรม',
     Icon: Building2,
     matchPrefix: '/dashboard/super-admin/organizations',
   },
@@ -51,6 +52,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'ทักษะ',
     Icon: Wrench,
     matchPrefix: '/dashboard/super-admin/skills',
+  },
+  {
+    href: '/dashboard/super-admin/users',
+    label: 'ผู้ใช้งาน',
+    Icon: Users,
+    matchPrefix: '/dashboard/super-admin/users',
   },
 ];
 

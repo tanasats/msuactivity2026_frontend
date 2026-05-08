@@ -66,6 +66,47 @@ export interface MasterFaculty {
   updated_at: string;
 }
 
+// ── user management (super_admin) ────────────────────────────────
+
+export type UserStatus = 'active' | 'disabled';
+
+// row จาก /api/users — list/detail ใช้ shape เดียวกัน
+export interface AdminUserSummary {
+  id: number;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  status: UserStatus;
+  msu_id: string | null;
+  faculty_id: number | null;
+  faculty_name: string | null;
+  picture_url: string | null;
+  staff_id: string | null;
+  position_th: string | null;
+  phone: string | null;
+  erp_faculty_name: string | null;
+  erp_department_name: string | null;
+  erp_program_name: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserAuditAction = 'role_change' | 'faculty_change' | 'status_change';
+
+export interface UserAuditLog {
+  id: number;
+  action: UserAuditAction;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  actor_id: number;
+  actor_name: string;
+  actor_email: string;
+}
+
 // ── public landing types ─────────────────────────────────────────
 
 export interface PublicStats {

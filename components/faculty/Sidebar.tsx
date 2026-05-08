@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   ClipboardList,
+  Home,
   LayoutDashboard,
   LogOut,
   X,
@@ -20,7 +21,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard/faculty', label: 'ภาพรวม', Icon: LayoutDashboard },
+    // ลิงก์ออกไป public landing — sidebar จะหายไปเพราะอยู่นอก dashboard scope
+  { 
+    href: '/', 
+    label: 'หน้าหลัก', 
+    Icon: Home 
+  },
+  { href: '/dashboard/faculty', label: 'Dashboard', Icon: LayoutDashboard },
   {
     href: '/dashboard/faculty/activities',
     label: 'กิจกรรม',

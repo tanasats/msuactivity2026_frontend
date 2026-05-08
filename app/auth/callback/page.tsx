@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
+import { roleHomePath } from '@/lib/auth-routes';
 import type { User } from '@/lib/types';
 
 export default function CallbackPage() {
@@ -28,10 +29,19 @@ export default function CallbackPage() {
     api
       .get<User>('/api/auth/me')
       .then((res) => {
-        useAuthStore.getState().setUser(res.data);
+        const store = useAuthStore.getState();
+        store.setAuth(token, res.data);
+        // ✦ บอก runBootstrap() ว่า session ปัจจุบันพร้อมใช้แล้ว — page ถัดไปจะไม่เรียก
+        //   /refresh + /me ซ้ำ (ลด race condition + ลดเวลา redirect ใน dev)
+        store.setBootstrapping(false);
+
         // ล้าง fragment ออกจาก URL bar (ไม่ทิ้งให้ proxy/log เห็น)
         window.history.replaceState(null, '', '/auth/callback');
-        router.replace('/dashboard');
+
+        // ✦ เด้งตรงไปหน้า role โดยข้าม /dashboard intermediate hop
+        //   เดิม: callback → /dashboard → /dashboard/<role>  (Next.js dev compile 2 หน้า)
+        //   ใหม่: callback → /dashboard/<role>               (compile หน้าเดียว)
+        router.replace(roleHomePath(res.data.role));
       })
       .catch((e) => {
         console.error(e);
