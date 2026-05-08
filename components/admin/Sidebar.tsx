@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  ClipboardList,
   LayoutDashboard,
-  Home,
-  LogOut,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -20,20 +19,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  // ลิงก์ออกไป public landing — sidebar จะหายไปเพราะอยู่นอก dashboard scope
-  { 
-    href: '/', 
-    label: 'หน้าหลัก', 
-    Icon: Home 
-  },
-
+  { href: '/dashboard/admin', label: 'ภาพรวม', Icon: LayoutDashboard },
   {
-    href: '/dashboard/student',
-    label: 'Dashboard',
-    Icon: LayoutDashboard,
-    matchPrefix: '/dashboard/student',
+    href: '/dashboard/admin/activities',
+    label: 'กิจกรรมทุกคณะ',
+    Icon: ClipboardList,
+    matchPrefix: '/dashboard/admin/activities',
   },
-
 ];
 
 interface Props {
@@ -41,7 +33,9 @@ interface Props {
   onClose: () => void;
 }
 
-// Sidebar ของนิสิต — โครงสร้างเดียวกับ faculty Sidebar (fixed desktop / drawer mobile)
+// Sidebar admin — แยกจาก faculty Sidebar เพราะ nav items + label ผู้ใช้ต่างกัน
+//   desktop (≥ md): fixed left-0 top-0, w-60
+//   mobile  (< md): drawer slide จากซ้าย + backdrop
 export function Sidebar({ open, onClose }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -78,14 +72,16 @@ export function Sidebar({ open, onClose }: Props) {
         }`}
       >
         <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
             M
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-gray-900">
               MSU Activity
             </p>
-            <p className="truncate text-xs text-gray-500">นิสิต</p>
+            <p className="truncate text-xs text-indigo-600">
+              {user?.role === 'super_admin' ? 'ผู้ดูแลระบบสูงสุด' : 'ผู้ดูแลระบบ'}
+            </p>
           </div>
           <button
             type="button"
@@ -107,7 +103,7 @@ export function Sidebar({ open, onClose }: Props) {
                 onClick={onClose}
                 className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
                   active
-                    ? 'bg-blue-50 text-blue-700'
+                    ? 'bg-indigo-50 text-indigo-700'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -138,16 +134,13 @@ export function Sidebar({ open, onClose }: Props) {
                 <p className="truncate text-sm font-medium text-gray-900">
                   {user.full_name}
                 </p>
-                <p className="truncate text-xs text-gray-500">
-                  {user.faculty_name}
-                </p>
+                <p className="truncate text-xs text-gray-500">{user.email}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
             >
-              <LogOut className="h-3.5 w-3.5" aria-hidden />
               ออกจากระบบ
             </button>
           </div>

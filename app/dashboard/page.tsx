@@ -14,8 +14,8 @@ const ROLE_ROUTES: Record<UserRole, string> = {
   student: '/dashboard/student',
   staff: '/dashboard/legacy',
   executive: '/dashboard/legacy',
-  admin: '/dashboard/legacy',
-  super_admin: '/dashboard/legacy',
+  admin: '/dashboard/admin',
+  super_admin: '/dashboard/super-admin',
 };
 
 export default function DashboardRedirect() {

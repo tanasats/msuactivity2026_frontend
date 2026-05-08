@@ -25,6 +25,47 @@ export interface User {
   erp_program_name: string | null;
 }
 
+// ── master data types (super_admin) ──────────────────────────────
+
+export interface MasterOrganization {
+  id: number;
+  code: string;
+  name: string;
+  parent_id: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MasterCategory {
+  id: number;
+  code: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MasterSkill {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// faculty: super_admin จัดการได้เต็มรูป (CRUD); category='A' = มีนิสิตสังกัด
+export interface MasterFaculty {
+  id: number;
+  code: string;
+  name: string;
+  category: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // ── public landing types ─────────────────────────────────────────
 
 export interface PublicStats {
@@ -126,6 +167,47 @@ export interface FacultyActivitySummary extends ActivitySummary {
   updated_at: string;
   is_mine: boolean;
   can_edit: boolean;
+  // can_edit_limited = แก้ได้บางฟิลด์ตอน status=WORK (capacity, location, dates, eligibles, description)
+  can_edit_limited: boolean;
+}
+
+// ── admin types ──────────────────────────────────────────────────
+
+// admin เห็นทุกคณะ → ต้องมี faculty_name (จาก JOIN faculties); ไม่มี is_mine/can_edit
+export interface AdminActivitySummary extends ActivitySummary {
+  created_by: number;
+  created_by_name: string;
+  faculty_id: number | null;
+  faculty_name: string | null;
+  organization_id: number;
+  category_id: number;
+  budget_source: string | null;
+  budget_requested: number | null;
+  budget_actual: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminActivityDetail extends AdminActivitySummary {
+  description: string;
+  approval_mode: 'AUTO' | 'MANUAL';
+  check_in_opens_at: string | null;
+  check_in_closes_at: string | null;
+  rejection_reason: string | null;
+  approved_at: string | null;
+  approved_by: number | null;
+  approved_by_name: string | null;
+  published_at: string | null;
+  skills: { id: number; code: string; name: string }[];
+  eligible_faculties: { id: number; code: string; name: string }[];
+  poster: ActivityPoster | null;
+  poster_url: string | null;
+  documents: ActivityDocument[];
+}
+
+export interface AdminStats {
+  counts: StatusCounts;
+  academic_year: number | null;
 }
 
 export interface FacultyActivityDetail extends FacultyActivitySummary {
@@ -162,6 +244,18 @@ export type RegistrationStatus =
 //   PASSED / FAILED    = เจ้าหน้าที่ประเมินแล้ว (PASSED → นับชั่วโมง, FAILED → ไม่นับ)
 export type EvaluationStatus = 'PENDING_EVALUATION' | 'PASSED' | 'FAILED';
 
+// รูปหลักฐานการเข้าร่วมกิจกรรม (เฉพาะ registration ที่ evaluation_status='PASSED' ถึงจะเพิ่มได้)
+export interface RegistrationPhoto {
+  id: number;
+  registration_id: number;
+  storage_key: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+  url: string; // presigned GET URL (เพิ่มจาก backend ก่อน response)
+}
+
 export interface StudentRegistration {
   registration_id: number;
   registration_status: RegistrationStatus;
@@ -171,6 +265,7 @@ export interface StudentRegistration {
   evaluation_status: EvaluationStatus | null;
   evaluated_at: string | null;
   evaluation_note: string | null;
+  photos: RegistrationPhoto[]; // [] ถ้ายังไม่ PASSED หรือยังไม่มีรูป
   activity_id: number;
   title: string;
   location: string;

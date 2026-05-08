@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Calendar,
   CheckCircle2,
   Clock,
+  Trophy,
+  Gem,
   HelpCircle,
+  ImagePlus,
   ListChecks,
   MapPin,
   Trash2,
+  X,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '@/lib/api';
@@ -22,15 +26,23 @@ import {
 } from '@/lib/format';
 import type {
   EvaluationStatus,
+  RegistrationPhoto,
   StudentRegistration,
   StudentStats,
 } from '@/lib/types';
+
+const MAX_PHOTOS_PER_REG = 5;
 
 // แบ่ง registration เป็น 2 หมวด:
 //   active  = PENDING_APPROVAL | REGISTERED  (ยังรอเข้าร่วม)
 //   history = ATTENDED | NO_SHOW             (เข้าร่วม/พลาดไปแล้ว)
 const ACTIVE_STATUSES = new Set(['PENDING_APPROVAL', 'REGISTERED']);
 const HISTORY_STATUSES = new Set(['ATTENDED', 'NO_SHOW']);
+
+interface AcademicYearsResponse {
+  current: number;
+  available: number[];
+}
 
 export default function StudentDashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -42,12 +54,19 @@ export default function StudentDashboardPage() {
     useState<StudentRegistration | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  async function load() {
+  // ปีการศึกษาที่กำลังเลือก (BE) — null ระหว่างโหลด default = current จาก backend
+  const [academicYear, setAcademicYear] = useState<number | null>(null);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+
+  async function load(year: number) {
     setError(null);
     try {
+      const yearParam = `academic_year=${year}`;
       const [regsRes, statsRes] = await Promise.all([
-        api.get<{ items: StudentRegistration[] }>('/api/student/registrations'),
-        api.get<StudentStats>('/api/student/stats'),
+        api.get<{ items: StudentRegistration[] }>(
+          `/api/student/registrations?${yearParam}`,
+        ),
+        api.get<StudentStats>(`/api/student/stats?${yearParam}`),
       ]);
       setItems(regsRes.data.items);
       setStats(statsRes.data);
@@ -57,10 +76,34 @@ export default function StudentDashboardPage() {
     }
   }
 
+  // โหลด academic-years ครั้งเดียวตอน mount → set default = current
   useEffect(() => {
     if (!user || user.role !== 'student') return;
-    load();
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get<AcademicYearsResponse>(
+          '/api/student/academic-years',
+        );
+        if (cancelled) return;
+        setAvailableYears(res.data.available);
+        setAcademicYear(res.data.current);
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const err = e as { response?: { data?: { message?: string } } };
+        setError(err.response?.data?.message ?? 'โหลดข้อมูลปีการศึกษาไม่สำเร็จ');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
+
+  // reload stats + registrations ทุกครั้งที่ academicYear เปลี่ยน
+  useEffect(() => {
+    if (!user || user.role !== 'student' || academicYear === null) return;
+    load(academicYear);
+  }, [user, academicYear]);
 
   async function executeCancel() {
     if (!pendingCancel) return;
@@ -71,7 +114,7 @@ export default function StudentDashboardPage() {
       );
       setPendingCancel(null);
       toast.success('ยกเลิกการสมัครเรียบร้อย');
-      await load();
+      if (academicYear !== null) await load(academicYear);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setPendingCancel(null);
@@ -89,16 +132,52 @@ export default function StudentDashboardPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl p-6 md:p-8">
-      <h1 className="mb-1 text-2xl font-bold text-gray-900">หน้าหลักของฉัน</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        สรุปการเข้าร่วมกิจกรรม + กิจกรรมที่สมัครไว้และผ่านมาแล้ว
-      </p>
+    <div className="mx-auto max-w-full p-6 md:p-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="mb-1 text-2xl font-bold text-gray-900">
+            แผงควบคุม - Dashobard
+          </h1>
+          <p className="text-sm text-gray-500">
+            สรุปการเข้าร่วมกิจกรรม + กิจกรรมที่สมัครไว้และผ่านมาแล้ว
+            {academicYear !== null && (
+              <span className="ml-1.5 text-gray-400">
+                · ปีการศึกษา {academicYear}
+              </span>
+            )}
+          </p>
+        </div>
+
+        {/* Academic year selector — default = current; เปลี่ยนแล้ว stats + registrations reload อัตโนมัติ */}
+        <label className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm">
+          <Calendar className="h-4 w-4 text-gray-400" aria-hidden />
+          <span className="text-gray-600">ปีการศึกษา</span>
+          <select
+            value={academicYear ?? ''}
+            onChange={(e) => setAcademicYear(Number(e.target.value))}
+            disabled={availableYears.length === 0}
+            className="bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
+            aria-label="เลือกปีการศึกษา"
+          >
+            {availableYears.length === 0 && academicYear !== null && (
+              <option value={academicYear}>{academicYear}</option>
+            )}
+            {availableYears.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {error && (
         <div className="mb-4 flex items-center justify-between rounded-lg bg-rose-50 p-4 text-sm text-rose-700">
           <span>{error}</span>
-          <button onClick={load} className="text-xs underline hover:no-underline">
+          <button
+            onClick={() => academicYear !== null && load(academicYear)}
+            className="text-xs underline hover:no-underline"
+          >
             ลองใหม่
           </button>
         </div>
@@ -107,14 +186,14 @@ export default function StudentDashboardPage() {
       {/* Stats */}
       <section className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
-          icon={<Clock className="h-5 w-5" aria-hidden />}
-          label="ชั่วโมงกิจกรรมรวม"
+          icon={<Trophy className="h-5 w-5" aria-hidden />}
+          label="ชั่วโมงกิจกรรม"
           value={stats ? formatNumber(stats.hours_total) : null}
           unit="ชั่วโมง"
         />
         <StatCard
-          icon={<HelpCircle className="h-5 w-5" aria-hidden />}
-          label="ชั่วโมง กยศ รวม"
+          icon={<Gem className="h-5 w-5" aria-hidden />}
+          label="ชั่วโมงจิตอาสา(กยศ)"
           value={stats ? formatNumber(stats.loan_hours_total) : null}
           unit="ชั่วโมง"
           tone="amber"
@@ -349,6 +428,9 @@ const EVALUATION_LABELS: Record<EvaluationStatus, { text: string; tone: string }
 
 // ── history row (compact) ────────────────────────────────────────
 function HistoryRow({ reg }: { reg: StudentRegistration }) {
+  // photos state เก็บไว้ใน row เอง (อัปเดต local หลัง upload/delete) — ไม่ trigger reload ทั้งหน้า
+  const [photos, setPhotos] = useState<RegistrationPhoto[]>(reg.photos ?? []);
+  const isPassed = reg.evaluation_status === 'PASSED';
   const attended = reg.registration_status === 'ATTENDED';
   const noShow = reg.registration_status === 'NO_SHOW';
 
@@ -396,7 +478,7 @@ function HistoryRow({ reg }: { reg: StudentRegistration }) {
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${resultLabel.tone}`}
           >
-            ผล: {resultLabel.text}
+            ผลประเมิน: {resultLabel.text}
           </span>
         </div>
         <p className="truncate text-sm font-medium text-gray-900">
@@ -416,7 +498,185 @@ function HistoryRow({ reg }: { reg: StudentRegistration }) {
             {reg.evaluation_note}
           </p>
         )}
+
+        {/* รูปหลักฐาน — เฉพาะ PASSED ถึงเปิดให้ใส่ */}
+        {isPassed && (
+          <PhotoSection
+            registrationId={reg.registration_id}
+            photos={photos}
+            onChanged={setPhotos}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+// ── photo section: thumbnails + upload + delete ──────────────────
+function PhotoSection({
+  registrationId,
+  photos,
+  onChanged,
+}: {
+  registrationId: number;
+  photos: RegistrationPhoto[];
+  onChanged: (next: RegistrationPhoto[]) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<RegistrationPhoto | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
+
+  const remaining = MAX_PHOTOS_PER_REG - photos.length;
+  const canAddMore = remaining > 0;
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+
+    // อัปโหลดทีละไฟล์ — เก็บผลลัพธ์ใส่ local state ทีละรูป (ไม่รอจบทั้งหมด)
+    let added: RegistrationPhoto[] = [];
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (photos.length + added.length >= MAX_PHOTOS_PER_REG) {
+          toast.error(`เพิ่มรูปได้ไม่เกิน ${MAX_PHOTOS_PER_REG} รูปต่อกิจกรรม`);
+          break;
+        }
+        try {
+          const fd = new FormData();
+          fd.append('photo', file);
+          const res = await api.post<RegistrationPhoto>(
+            `/api/student/registrations/${registrationId}/photos`,
+            fd,
+            { headers: { 'Content-Type': 'multipart/form-data' } },
+          );
+          added = [...added, res.data];
+          // อัปเดต state ทันทีหลังแต่ละรูป — ผู้ใช้เห็น progress
+          onChanged([...photos, ...added]);
+        } catch (e: unknown) {
+          const err = e as { response?: { data?: { message?: string } } };
+          toast.error(
+            err.response?.data?.message ?? `อัปโหลด ${file.name} ไม่สำเร็จ`,
+          );
+          // ไม่หยุด — ลองรูปถัดไป
+        }
+      }
+      if (added.length > 0) {
+        toast.success(`อัปโหลด ${added.length} รูปเรียบร้อย`);
+      }
+    } finally {
+      setUploading(false);
+      // reset input value เพื่อให้เลือกไฟล์เดิมซ้ำได้
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function executeDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await api.delete(
+        `/api/student/registrations/${registrationId}/photos/${pendingDelete.id}`,
+      );
+      onChanged(photos.filter((p) => p.id !== pendingDelete.id));
+      toast.success('ลบรูปเรียบร้อย');
+      setPendingDelete(null);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'ลบรูปไม่สำเร็จ');
+      setPendingDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-medium text-gray-700">
+          รูปภาพหลักฐานการเข้าร่วม{' '}
+          <span className="font-normal text-gray-400">
+            ({photos.length}/{MAX_PHOTOS_PER_REG} รูป)
+          </span>
+        </p>
+        {canAddMore && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+            >
+              <ImagePlus className="h-3.5 w-3.5" aria-hidden />
+              {uploading ? 'กำลังอัปโหลด...' : 'เพิ่มรูป'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              hidden
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+          </>
+        )}
+      </div>
+
+      {photos.length === 0 ? (
+        <p className="text-xs text-gray-400">
+          ยังไม่มีรูปภาพ — เพิ่มได้สูงสุด {MAX_PHOTOS_PER_REG} รูป (JPG/PNG/WebP, ≤ 5 MB)
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+          {photos.map((p) => (
+            <div
+              key={p.id}
+              className="group relative aspect-square overflow-hidden rounded-md border border-gray-200 bg-white"
+            >
+              <a
+                href={p.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={p.filename}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.url}
+                  alt={p.filename}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </a>
+              <button
+                type="button"
+                onClick={() => setPendingDelete(p)}
+                className="absolute right-1 top-1 hidden rounded-md bg-rose-600/90 p-1 text-white opacity-90 hover:bg-rose-700 group-hover:block"
+                aria-label="ลบรูป"
+                title="ลบรูป"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        tone="danger"
+        title="ลบรูปนี้?"
+        message={
+          pendingDelete && (
+            <>ลบรูป <strong>{pendingDelete.filename}</strong> ไม่สามารถกู้คืนได้</>
+          )
+        }
+        confirmLabel="ลบ"
+        loading={deleting}
+        onConfirm={executeDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

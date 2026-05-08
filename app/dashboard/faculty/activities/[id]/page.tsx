@@ -70,10 +70,12 @@ export default function FacultyActivityDetailPage() {
     if (!id) return;
     setSaving(true);
     try {
-      const res = await api.patch<FacultyActivityDetail>(
-        `/api/faculty/activities/${id}`,
-        payload,
-      );
+      // status DRAFT → endpoint เต็ม / status WORK → endpoint limited (subset เท่านั้น)
+      const endpoint =
+        activity?.can_edit_limited && !activity?.can_edit
+          ? `/api/faculty/activities/${id}/limited`
+          : `/api/faculty/activities/${id}`;
+      const res = await api.patch<FacultyActivityDetail>(endpoint, payload);
       setActivity(res.data);
       toast.success('บันทึกแล้ว');
     } finally {
@@ -128,7 +130,7 @@ export default function FacultyActivityDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-6 md:p-8">
+    <div className="mx-auto max-w-full p-6 md:p-8">
       <Link
         href="/dashboard/faculty/activities"
         className="mb-4 inline-block text-sm text-blue-600 hover:underline"
@@ -185,11 +187,16 @@ export default function FacultyActivityDetailPage() {
               </Link>
             </>
           )}
-          {!activity.can_edit && activity.is_mine && (
+          {!activity.can_edit && !activity.can_edit_limited && activity.is_mine && (
             <p className="text-xs text-gray-500">
               {activity.status === 'PENDING_APPROVAL'
                 ? 'รอ admin อนุมัติ — แก้ไขไม่ได้'
                 : `สถานะ ${activity.status} — ไม่อนุญาตให้แก้ไข`}
+            </p>
+          )}
+          {activity.can_edit_limited && activity.is_mine && (
+            <p className="text-xs text-amber-700">
+              กิจกรรมเริ่มดำเนินการแล้ว — แก้ไขได้บางฟิลด์เท่านั้น
             </p>
           )}
           {!activity.is_mine && (
@@ -208,10 +215,20 @@ export default function FacultyActivityDetailPage() {
 
       </div>
 
-      {/* Form (edit mode) หรือ Read-only summary */}
+      {/* Form (full edit / limited edit) หรือ Read-only summary
+            DRAFT → can_edit       → mode='edit' (แก้ทุกฟิลด์)
+            WORK  → can_edit_limited → mode='edit-limited' (แก้เฉพาะฟิลด์ที่อนุญาต)
+            อื่น  → read-only */}
       {activity.can_edit ? (
         <ActivityForm
           mode="edit"
+          initial={activity}
+          saving={saving}
+          onSave={handleSave}
+        />
+      ) : activity.can_edit_limited ? (
+        <ActivityForm
+          mode="edit-limited"
           initial={activity}
           saving={saving}
           onSave={handleSave}

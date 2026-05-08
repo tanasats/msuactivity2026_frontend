@@ -50,7 +50,10 @@ interface RefData {
 }
 
 interface Props {
-  mode: 'create' | 'edit';
+  // create        = สร้างใหม่ทุกฟิลด์
+  // edit          = แก้ทุกฟิลด์ (DRAFT)
+  // edit-limited  = แก้เฉพาะ capacity/description/location/dates/eligibles (WORK)
+  mode: 'create' | 'edit' | 'edit-limited';
   initial?: FacultyActivityDetail | null;
   saving: boolean;
   onSave: (payload: unknown) => Promise<void>;
@@ -266,21 +269,28 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  const isLimited = mode === 'edit-limited';
   const payload = useMemo(
-    () => ({ ...buildPayload(value), poster }),
-    [value, poster],
+    () =>
+      isLimited
+        ? buildLimitedPayload(value)
+        : { ...buildPayload(value), poster },
+    [isLimited, value, poster],
   );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
-    if (!poster) {
-      setSubmitError('กรุณาอัปโหลดภาพโปสเตอร์ก่อนบันทึก');
-      return;
-    }
-    if (posterUploading) {
-      setSubmitError('กรุณารอให้อัปโหลดภาพโปสเตอร์เสร็จก่อน');
-      return;
+    // โหมดเต็ม: ต้องมี poster + อัปโหลดเสร็จ; โหมดจำกัด: ข้ามทั้งสอง
+    if (!isLimited) {
+      if (!poster) {
+        setSubmitError('กรุณาอัปโหลดภาพโปสเตอร์ก่อนบันทึก');
+        return;
+      }
+      if (posterUploading) {
+        setSubmitError('กรุณารอให้อัปโหลดภาพโปสเตอร์เสร็จก่อน');
+        return;
+      }
     }
     try {
       await onSave(payload);
@@ -311,7 +321,27 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Section 0: ภาพโปสเตอร์ (required) */}
+      {/* Banner — โหมดจำกัด: บอกว่าฟิลด์ไหนแก้ได้ */}
+      {isLimited && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">
+            แก้ไขโหมดจำกัด — กิจกรรมเริ่มดำเนินการแล้ว
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            แก้ได้:
+            จำนวนที่รับ · รายละเอียด · สถานที่ · วันเวลากิจกรรม · ช่วงรับสมัคร ·
+            คณะที่รับสมัคร · ทักษะที่จะได้รับ · โหมดอนุมัติผู้สมัคร · งบประมาณที่จ่ายจริง
+            <br />
+            ฟิลด์อื่นที่จาง = ล็อกไว้ (ต้องการแก้ ทำได้เฉพาะตอน "ฉบับร่าง")
+          </p>
+        </div>
+      )}
+
+      {/* Section 0: ภาพโปสเตอร์ — ล็อกตอน limited */}
+      <fieldset
+        disabled={isLimited}
+        className="space-y-6 disabled:opacity-60"
+      >
       <Section title="ภาพโปสเตอร์กิจกรรม">
         <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
           {/* Preview */}
@@ -372,8 +402,9 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
           </div>
         </div>
       </Section>
+      </fieldset>
 
-      {/* Section 1: ข้อมูลพื้นฐาน */}
+      {/* Section 1: ข้อมูลพื้นฐาน — title/org/category/year/sem ล็อกใน limited; description/location ยังแก้ได้ */}
       <Section title="ข้อมูลพื้นฐาน">
         <Field label="ชื่อกิจกรรม" required>
           <input
@@ -382,6 +413,7 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
             onChange={(e) => setField('title', e.target.value)}
             className={inputClass}
             required
+            disabled={isLimited}
           />
         </Field>
         <Field label="รายละเอียด">
@@ -401,77 +433,79 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
             required
           />
         </Field>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="หน่วยงานเจ้าของ" required>
-            <select
-              value={value.organization_id ?? ''}
-              onChange={(e) =>
-                setField(
-                  'organization_id',
-                  e.target.value === '' ? null : Number(e.target.value),
-                )
-              }
-              className={inputClass}
-              required
-            >
-              <option value="">— เลือก —</option>
-              {refs!.organizations.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.code} · {o.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="ประเภทกิจกรรม" required>
-            <select
-              value={value.category_id ?? ''}
-              onChange={(e) =>
-                setField(
-                  'category_id',
-                  e.target.value === '' ? null : Number(e.target.value),
-                )
-              }
-              className={inputClass}
-              required
-            >
-              <option value="">— เลือก —</option>
-              {refs!.categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code}. {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="ปีการศึกษา (พ.ศ.)" required>
-            <input
-              type="number"
-              value={value.academic_year}
-              onChange={(e) =>
-                setField('academic_year', Number(e.target.value))
-              }
-              className={inputClass}
-              min={2500}
-              max={2700}
-              required
-            />
-          </Field>
-          <Field label="ภาคเรียน" required>
-            <div className="flex gap-3 pt-2">
-              {[1, 2, 3].map((s) => (
-                <label key={s} className="flex items-center gap-1 text-sm">
-                  <input
-                    type="radio"
-                    checked={value.semester === s}
-                    onChange={() => setField('semester', s)}
-                  />
-                  {s === 3 ? 'ฤดูร้อน' : `${s}`}
-                </label>
-              ))}
-            </div>
-          </Field>
-        </div>
+        <fieldset disabled={isLimited} className="contents">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="หน่วยงานเจ้าของ" required>
+              <select
+                value={value.organization_id ?? ''}
+                onChange={(e) =>
+                  setField(
+                    'organization_id',
+                    e.target.value === '' ? null : Number(e.target.value),
+                  )
+                }
+                className={inputClass}
+                required
+              >
+                <option value="">— เลือก —</option>
+                {refs!.organizations.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.code} · {o.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="ประเภทกิจกรรม" required>
+              <select
+                value={value.category_id ?? ''}
+                onChange={(e) =>
+                  setField(
+                    'category_id',
+                    e.target.value === '' ? null : Number(e.target.value),
+                  )
+                }
+                className={inputClass}
+                required
+              >
+                <option value="">— เลือก —</option>
+                {refs!.categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code}. {c.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="ปีการศึกษา (พ.ศ.)" required>
+              <input
+                type="number"
+                value={value.academic_year}
+                onChange={(e) =>
+                  setField('academic_year', Number(e.target.value))
+                }
+                className={inputClass}
+                min={2500}
+                max={2700}
+                required
+              />
+            </Field>
+            <Field label="ภาคเรียน" required>
+              <div className="flex gap-3 pt-2">
+                {[1, 2, 3].map((s) => (
+                  <label key={s} className="flex items-center gap-1 text-sm">
+                    <input
+                      type="radio"
+                      checked={value.semester === s}
+                      onChange={() => setField('semester', s)}
+                    />
+                    {s === 3 ? 'ฤดูร้อน' : `${s}`}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          </div>
+        </fieldset>
       </Section>
 
       {/* Section 2: เวลาและความจุ */}
@@ -506,6 +540,7 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
               min={0.1}
               step={0.1}
               required
+              disabled={isLimited}
             />
           </Field>
           <Field
@@ -519,6 +554,7 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
               className={inputClass}
               min={0}
               step={0.1}
+              disabled={isLimited}
             />
           </Field>
           <Field label="จำนวนที่รับ" required>
@@ -534,30 +570,34 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
         </div>
       </Section>
 
-      {/* Section 2.5: งบประมาณ */}
+      {/* Section 2.5: งบประมาณ — แหล่ง/ขอใช้ ล็อกใน limited; จ่ายจริง แก้ได้ */}
       <Section title="งบประมาณ">
-        <Field label="แหล่งงบประมาณ" required>
-          <input
-            type="text"
-            value={value.budget_source}
-            onChange={(e) => setField('budget_source', e.target.value)}
-            className={inputClass}
-            placeholder="เช่น งบประมาณรายจ่ายประจำปี / งบกิจการนิสิต / ผู้สนับสนุน X"
-            required
-          />
-        </Field>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="งบประมาณที่ขอใช้ (บาท)" required>
+        <fieldset disabled={isLimited} className="contents">
+          <Field label="แหล่งงบประมาณ" required>
             <input
-              type="number"
-              value={value.budget_requested}
-              onChange={(e) => setField('budget_requested', e.target.value)}
+              type="text"
+              value={value.budget_source}
+              onChange={(e) => setField('budget_source', e.target.value)}
               className={inputClass}
-              min={0}
-              step="0.01"
+              placeholder="เช่น งบประมาณรายจ่ายประจำปี / งบกิจการนิสิต / ผู้สนับสนุน X"
               required
             />
           </Field>
+        </fieldset>
+        <div className="grid gap-4 md:grid-cols-2">
+          <fieldset disabled={isLimited} className="contents">
+            <Field label="งบประมาณที่ขอใช้ (บาท)" required>
+              <input
+                type="number"
+                value={value.budget_requested}
+                onChange={(e) => setField('budget_requested', e.target.value)}
+                className={inputClass}
+                min={0}
+                step="0.01"
+                required
+              />
+            </Field>
+          </fieldset>
           <Field label="งบประมาณที่จ่ายจริง (บาท)" hint="ใส่หลังกิจกรรมจบ">
             <input
               type="number"
@@ -641,6 +681,7 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
       </Section>
 
       {/* Section 4: ช่วงเวลา check-in สำหรับเจ้าหน้าที่ */}
+      <fieldset disabled={isLimited} className="space-y-6 disabled:opacity-60">
       <Section title="ช่วงเวลา check-in (สำหรับเจ้าหน้าที่)">
         <p className="-mt-2 text-xs text-gray-500">
           ผู้เข้าร่วมจะใช้ QR ของตัวเอง (ระบบสร้างให้อัตโนมัติเมื่อลงทะเบียนสำเร็จ)
@@ -671,6 +712,7 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
           </Field>
         </div>
       </Section>
+      </fieldset>
 
       {submitError && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
@@ -689,6 +731,25 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
       </div>
     </form>
   );
+}
+
+// payload subset สำหรับโหมด limited (status=WORK)
+//   ส่งเฉพาะ field ที่ backend อนุญาต — กัน accidental change ของ field สำคัญ
+function buildLimitedPayload(v: ActivityFormValue) {
+  return {
+    capacity: v.capacity,
+    description: v.description,
+    location: v.location,
+    start_at: localInputToIso(v.start_at),
+    end_at: localInputToIso(v.end_at),
+    registration_open_at: localInputToIso(v.registration_open_at),
+    registration_close_at: localInputToIso(v.registration_close_at),
+    approval_mode: v.approval_mode,
+    budget_actual:
+      v.budget_actual.trim() === '' ? null : Number(v.budget_actual),
+    skill_ids: v.skill_ids,
+    eligible_faculty_ids: v.eligible_faculty_ids,
+  };
 }
 
 function buildPayload(v: ActivityFormValue) {
