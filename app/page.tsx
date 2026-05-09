@@ -213,6 +213,8 @@ export default function LandingPage() {
       <footer className="mt-12 border-t border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-6 text-center text-sm text-gray-500">
           © {new Date().getFullYear()} มหาวิทยาลัยมหาสารคาม — ระบบจัดการกิจกรรมนิสิต
+          <br />
+          <div className="text-small">ผู้พัฒนา: นายธนศาสตร์ สุดจริง tanasat.s@msu.ac.th</div> 
         </div>
       </footer>
     </main>

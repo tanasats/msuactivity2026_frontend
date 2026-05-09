@@ -8,6 +8,7 @@ import {
   Clock,
   Trophy,
   Gem,
+  Globe2,
   HelpCircle,
   ImagePlus,
   ListChecks,
@@ -49,6 +50,8 @@ export default function StudentDashboardPage() {
 
   const [items, setItems] = useState<StudentRegistration[] | null>(null);
   const [stats, setStats] = useState<StudentStats | null>(null);
+  // overview = ทุกปีการศึกษารวมกัน (ไม่ขึ้นกับ year filter ที่เลือก)
+  const [overviewStats, setOverviewStats] = useState<StudentStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingCancel, setPendingCancel] =
     useState<StudentRegistration | null>(null);
@@ -62,14 +65,18 @@ export default function StudentDashboardPage() {
     setError(null);
     try {
       const yearParam = `academic_year=${year}`;
-      const [regsRes, statsRes] = await Promise.all([
+      // ดึง 3 endpoint พร้อมกัน — registrations + stats ปีที่เลือก + overview ทุกปี
+      // (ภาระ DB เพิ่มไม่มาก เพราะ aggregate ใช้ index user_id อยู่แล้ว)
+      const [regsRes, yearStatsRes, overviewStatsRes] = await Promise.all([
         api.get<{ items: StudentRegistration[] }>(
           `/api/student/registrations?${yearParam}`,
         ),
         api.get<StudentStats>(`/api/student/stats?${yearParam}`),
+        api.get<StudentStats>(`/api/student/stats`), // ไม่ส่ง academic_year = ทุกปี
       ]);
       setItems(regsRes.data.items);
-      setStats(statsRes.data);
+      setStats(yearStatsRes.data);
+      setOverviewStats(overviewStatsRes.data);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setError(err.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
@@ -183,28 +190,69 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
-      {/* Stats */}
-      <section className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          icon={<Trophy className="h-5 w-5" aria-hidden />}
-          label="ชั่วโมงกิจกรรม"
-          value={stats ? formatNumber(stats.hours_total) : null}
-          unit="ชั่วโมง"
-        />
-        <StatCard
-          icon={<Gem className="h-5 w-5" aria-hidden />}
-          label="ชั่วโมงจิตอาสา(กยศ)"
-          value={stats ? formatNumber(stats.loan_hours_total) : null}
-          unit="ชั่วโมง"
-          tone="amber"
-        />
-        <StatCard
-          icon={<ListChecks className="h-5 w-5" aria-hidden />}
-          label="กิจกรรมที่เข้าร่วม"
-          value={stats ? formatNumber(stats.activities_count) : null}
-          unit="กิจกรรม"
-          tone="emerald"
-        />
+      {/* Stats — แบ่ง 2 ระดับ:
+            1) ภาพรวม (ทุกปีการศึกษารวม) — สะสมตลอดอายุการศึกษา
+            2) ปีการศึกษาที่เลือก (default = ปัจจุบัน) — สำหรับติดตามเป้าปีนั้น */}
+      <section className="mb-4">
+        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+          <Globe2 className="h-4 w-4 text-blue-600" aria-hidden />
+          ภาพรวม
+          <span className="font-normal text-gray-400">(ทุกปีการศึกษา)</span>
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <StatCard
+            icon={<Trophy className="h-5 w-5" aria-hidden />}
+            label="ชั่วโมงกิจกรรม"
+            value={overviewStats ? formatNumber(overviewStats.hours_total) : null}
+            unit="ชั่วโมง"
+          />
+          <StatCard
+            icon={<Gem className="h-5 w-5" aria-hidden />}
+            label="ชั่วโมงจิตอาสา(กยศ)"
+            value={overviewStats ? formatNumber(overviewStats.loan_hours_total) : null}
+            unit="ชั่วโมง"
+            tone="amber"
+          />
+          <StatCard
+            icon={<ListChecks className="h-5 w-5" aria-hidden />}
+            label="กิจกรรมที่เข้าร่วม"
+            value={overviewStats ? formatNumber(overviewStats.activities_count) : null}
+            unit="กิจกรรม"
+            tone="emerald"
+          />
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+          <Calendar className="h-4 w-4 text-violet-600" aria-hidden />
+          ปีการศึกษา{' '}
+          <span className="text-violet-700">
+            {academicYear ?? '—'}
+          </span>
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <StatCard
+            icon={<Trophy className="h-5 w-5" aria-hidden />}
+            label="ชั่วโมงกิจกรรม"
+            value={stats ? formatNumber(stats.hours_total) : null}
+            unit="ชั่วโมง"
+          />
+          <StatCard
+            icon={<Gem className="h-5 w-5" aria-hidden />}
+            label="ชั่วโมงจิตอาสา(กยศ)"
+            value={stats ? formatNumber(stats.loan_hours_total) : null}
+            unit="ชั่วโมง"
+            tone="amber"
+          />
+          <StatCard
+            icon={<ListChecks className="h-5 w-5" aria-hidden />}
+            label="กิจกรรมที่เข้าร่วม"
+            value={stats ? formatNumber(stats.activities_count) : null}
+            unit="กิจกรรม"
+            tone="emerald"
+          />
+        </div>
       </section>
 
       {/* Active section: PENDING + REGISTERED */}
