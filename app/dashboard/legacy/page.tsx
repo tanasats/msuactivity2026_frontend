@@ -119,9 +119,9 @@ export default function LegacyDashboardPage() {
             </div>
           )}
 
-          <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          {/* <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             หน้า Dashboard เฉพาะตาม role ของท่านยังกำลังพัฒนา
-          </div>
+          </div> */}
         </div>
       </div>
     </main>
