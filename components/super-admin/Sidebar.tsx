@@ -64,7 +64,7 @@ const NAV_ITEMS: NavItem[] = [
 const ADMIN_LINKS: NavItem[] = [
   {
     href: '/dashboard/admin/activities',
-    label: 'อนุมัติกิจกรรม',
+    label: 'จัดการกิจกรรม',
     Icon: ClipboardList,
     matchPrefix: '/dashboard/admin',
   },
