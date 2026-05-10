@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { QrCode, Users } from 'lucide-react';
+import { CheckCircle2, QrCode, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { ActivityForm } from '@/components/faculty/ActivityForm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DocumentsSection } from '@/components/faculty/DocumentsSection';
+import { GallerySection } from '@/components/faculty/GallerySection';
 import { StatusBadge } from '@/components/faculty/StatusBadge';
 import {
   formatActivityRange,
@@ -29,6 +30,8 @@ export default function FacultyActivityDetailPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -99,6 +102,25 @@ export default function FacultyActivityDetailPage() {
       toast.error(err.response?.data?.message ?? 'ส่งไม่สำเร็จ');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function executeComplete() {
+    if (!id) return;
+    setCompleting(true);
+    try {
+      const res = await api.post<FacultyActivityDetail>(
+        `/api/faculty/activities/${id}/complete`,
+      );
+      setActivity(res.data);
+      setShowCompleteConfirm(false);
+      toast.success('ปิดโครงการเรียบร้อย');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      setShowCompleteConfirm(false);
+      toast.error(err.response?.data?.message ?? 'ปิดโครงการไม่สำเร็จ');
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -187,6 +209,18 @@ export default function FacultyActivityDetailPage() {
               </Link>
             </>
           )}
+          {/* ปิดโครงการ — เฉพาะผู้สร้าง + status WORK */}
+          {activity.is_mine && activity.status === 'WORK' && (
+            <button
+              type="button"
+              onClick={() => setShowCompleteConfirm(true)}
+              disabled={completing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 shadow-sm hover:bg-amber-100 disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden />
+              ปิดโครงการ
+            </button>
+          )}
           {!activity.can_edit && !activity.can_edit_limited && activity.is_mine && (
             <p className="text-xs text-gray-500">
               {activity.status === 'PENDING_APPROVAL'
@@ -250,6 +284,17 @@ export default function FacultyActivityDetailPage() {
         />
       </div>
 
+      {/* รูปประกอบกิจกรรม — แสดงเมื่อ status WORK/COMPLETED
+          แก้ได้ (เพิ่ม/ลบ) เฉพาะผู้สร้าง + status WORK เท่านั้น */}
+      {(activity.status === 'WORK' || activity.status === 'COMPLETED') && (
+        <div className="mt-6">
+          <GallerySection
+            activityId={activity.id}
+            manageable={activity.is_mine && activity.status === 'WORK'}
+          />
+        </div>
+      )}
+
       <ConfirmDialog
         open={showSubmitConfirm}
         title="ส่งกิจกรรมให้ admin อนุมัติ?"
@@ -264,6 +309,36 @@ export default function FacultyActivityDetailPage() {
         loading={submitting}
         onConfirm={executeSubmit}
         onCancel={() => setShowSubmitConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={showCompleteConfirm}
+        tone="danger"
+        title="ปิดโครงการนี้?"
+        message={
+          <div className="space-y-2">
+            <p>
+              เปลี่ยนสถานะ <strong>{activity.title}</strong> เป็น{' '}
+              <strong>เสร็จสิ้น (COMPLETED)</strong>
+            </p>
+            <ul className="ml-4 list-disc text-xs text-gray-600">
+              <li>หลังปิดจะ <strong>เพิ่ม/ลบรูปประกอบไม่ได้</strong></li>
+              <li>การลงทะเบียน + check-in จะถูกหยุดทันที</li>
+              <li>ถ้าต้องเปิดกลับมา ต้องผ่าน super_admin</li>
+            </ul>
+            {new Date(activity.end_at).getTime() > Date.now() && (
+              <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
+                ⚠️ กิจกรรมยังไม่สิ้นสุดตามกำหนด ({formatDateTime(activity.end_at)}) —
+                แน่ใจหรือไม่ว่าต้องการปิดก่อนเวลา?
+              </p>
+            )}
+          </div>
+        }
+        confirmLabel="ปิดโครงการ"
+        cancelLabel="ยกเลิก"
+        loading={completing}
+        onConfirm={executeComplete}
+        onCancel={() => setShowCompleteConfirm(false)}
       />
     </div>
   );

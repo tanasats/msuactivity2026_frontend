@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -8,9 +8,13 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Loader2,
   MapPin,
+  Search,
   ShieldCheck,
+  UserCog,
   Users,
+  X,
   XCircle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -19,7 +23,12 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { StatusBadge } from '@/components/faculty/StatusBadge';
 import { formatActivityRange, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/lib/store';
-import type { ActivityStatus, AdminActivityDetail } from '@/lib/types';
+import type {
+  ActivityStatus,
+  AdminActivityDetail,
+  AdminUserSummary,
+  UserRole,
+} from '@/lib/types';
 
 const STATUS_LABEL: Record<ActivityStatus, string> = {
   DRAFT: 'ฉบับร่าง',
@@ -41,6 +50,7 @@ export default function AdminActivityDetailPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [showSetStatus, setShowSetStatus] = useState(false);
   const [targetStatus, setTargetStatus] = useState<ActivityStatus>('DRAFT');
+  const [showSetCreator, setShowSetCreator] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -100,6 +110,24 @@ export default function AdminActivityDetailPage() {
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message ?? 'เปลี่ยนสถานะไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function executeSetCreator(newCreatorId: number) {
+    if (!id) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/activities/${id}/creator`, {
+        created_by: newCreatorId,
+      });
+      toast.success('เปลี่ยนผู้สร้างกิจกรรมแล้ว');
+      setShowSetCreator(false);
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'เปลี่ยนผู้สร้างไม่สำเร็จ');
     } finally {
       setBusy(false);
     }
@@ -188,8 +216,22 @@ export default function AdminActivityDetailPage() {
         <h1 className="mb-1 text-xl font-bold text-gray-900 md:text-2xl">
           {activity.title}
         </h1>
-        <p className="text-sm text-gray-500">
-          {activity.organization_name} · สร้างโดย {activity.created_by_name}
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
+          <span>{activity.organization_name}</span>
+          <span aria-hidden>·</span>
+          <span>สร้างโดย {activity.created_by_name}</span>
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowSetCreator(true)}
+              disabled={busy}
+              title="super_admin: เปลี่ยนผู้สร้างกิจกรรม"
+              className="inline-flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+            >
+              <UserCog className="h-3 w-3" aria-hidden />
+              เปลี่ยนผู้สร้าง
+            </button>
+          )}
         </p>
 
         {/* approve/reject buttons — เฉพาะ PENDING_APPROVAL
@@ -435,6 +477,17 @@ export default function AdminActivityDetailPage() {
         onCancel={() => setShowApprove(false)}
       />
 
+      {/* Set-creator dialog (super_admin only) — โอน ownership */}
+      {showSetCreator && (
+        <ChangeCreatorDialog
+          currentCreatorName={activity.created_by_name}
+          currentCreatorId={activity.created_by}
+          busy={busy}
+          onClose={() => setShowSetCreator(false)}
+          onConfirm={(uid) => executeSetCreator(uid)}
+        />
+      )}
+
       {/* Set-status dialog (super_admin only) — เปลี่ยนสถานะแบบ override state machine */}
       {showSetStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -569,6 +622,237 @@ export default function AdminActivityDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Change-creator dialog (super_admin only) ────────────────────
+//   - search debounced 300ms ผ่าน /api/users
+//   - default filter role=faculty_staff (เคสที่พบบ่อยสุด)
+//   - role อื่นที่ allow: admin / super_admin (executive/student/staff disabled — backend reject)
+const ALLOWED_CREATOR_ROLES: UserRole[] = [
+  'faculty_staff',
+  'admin',
+  'super_admin',
+];
+const ROLE_LABEL: Record<UserRole, string> = {
+  student: 'นิสิต',
+  staff: 'บุคลากร',
+  faculty_staff: 'เจ้าหน้าที่คณะ',
+  executive: 'ผู้บริหาร',
+  admin: 'admin',
+  super_admin: 'super_admin',
+};
+
+function ChangeCreatorDialog({
+  currentCreatorName,
+  currentCreatorId,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  currentCreatorName: string;
+  currentCreatorId: number;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (newCreatorId: number) => void;
+}) {
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] =
+    useState<(typeof ALLOWED_CREATOR_ROLES)[number]>('faculty_staff');
+  const [results, setResults] = useState<AdminUserSummary[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  // debounce search 300ms
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  // race-guard: เก่าค่าหลัง — ignore
+  const seq = useRef(0);
+  useEffect(() => {
+    const my = ++seq.current;
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set('limit', '20');
+    params.set('role', roleFilter);
+    params.set('status', 'active');
+    if (search) params.set('q', search);
+    api
+      .get<{ items: AdminUserSummary[] }>(`/api/users?${params.toString()}`)
+      .then((r) => {
+        if (my !== seq.current) return;
+        setResults(r.data.items);
+      })
+      .catch(() => {
+        if (my !== seq.current) return;
+        setResults([]);
+      })
+      .finally(() => {
+        if (my === seq.current) setLoading(false);
+      });
+  }, [search, roleFilter]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <UserCog className="h-5 w-5 text-violet-600" aria-hidden />
+            เปลี่ยนผู้สร้างกิจกรรม (super_admin)
+          </h2>
+          <p className="mt-1 text-xs text-gray-500">
+            ปัจจุบัน: <strong>{currentCreatorName}</strong>
+          </p>
+        </div>
+
+        <div className="border-b border-gray-100 px-5 py-3">
+          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="ค้นหา ชื่อ / อีเมล / รหัสนิสิต"
+                className="w-full rounded-lg border border-gray-300 bg-white py-1.5 pl-9 pr-9 text-sm shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              />
+              {searchInput !== search && searchInput.length > 0 && (
+                <Loader2
+                  className="pointer-events-none absolute right-9 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400"
+                  aria-hidden
+                />
+              )}
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:bg-gray-100"
+                  aria-label="ล้าง"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <select
+              value={roleFilter}
+              onChange={(e) =>
+                setRoleFilter(e.target.value as (typeof ALLOWED_CREATOR_ROLES)[number])
+              }
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              aria-label="กรอง role"
+            >
+              {ALLOWED_CREATOR_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABEL[r]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {loading && !results && (
+            <p className="px-3 py-6 text-center text-sm text-gray-400">
+              กำลังโหลด...
+            </p>
+          )}
+          {results && results.length === 0 && (
+            <p className="px-3 py-6 text-center text-sm text-gray-500">
+              ไม่พบผู้ใช้
+            </p>
+          )}
+          {results && results.length > 0 && (
+            <ul className="divide-y divide-gray-100">
+              {results.map((u) => {
+                const isCurrent = u.id === currentCreatorId;
+                const isSelected = u.id === selectedId;
+                return (
+                  <li key={u.id}>
+                    <button
+                      type="button"
+                      onClick={() => !isCurrent && setSelectedId(u.id)}
+                      disabled={isCurrent}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition ${
+                        isSelected
+                          ? 'bg-violet-50 ring-2 ring-violet-300'
+                          : isCurrent
+                            ? 'cursor-not-allowed opacity-50'
+                            : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      {u.picture_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={u.picture_url}
+                          alt=""
+                          width={36}
+                          height={36}
+                          loading="lazy"
+                          className="h-9 w-9 shrink-0 rounded-full border border-gray-200 bg-gray-100"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-bold text-gray-500">
+                          {u.full_name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {u.full_name}
+                          </p>
+                          {isCurrent && (
+                            <span className="shrink-0 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700">
+                              ผู้สร้างปัจจุบัน
+                            </span>
+                          )}
+                        </div>
+                        <p className="truncate text-xs text-gray-500">
+                          {u.email}
+                          {u.faculty_name && (
+                            <span className="ml-1 text-gray-400">
+                              · {u.faculty_name}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                        {ROLE_LABEL[u.role]}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={() => selectedId !== null && onConfirm(selectedId)}
+            disabled={busy || selectedId === null}
+            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'กำลังบันทึก...' : 'โอนผู้สร้าง'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

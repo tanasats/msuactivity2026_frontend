@@ -164,6 +164,20 @@ export interface PublicActivityDocument {
   url: string;
 }
 
+// รูปประกอบกิจกรรม (kind=GALLERY) — เพิ่ม/ลบโดยผู้สร้างได้เฉพาะ status=WORK
+export interface ActivityGalleryPhoto {
+  id: number;
+  activity_id: number;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  storage_key: string;
+  display_order: number;
+  uploaded_by: number;
+  uploaded_at: string;
+  url: string;
+}
+
 // เอกสารประกอบ — faculty version (รวม is_public + display_name editable)
 export interface ActivityDocument {
   id: number;
