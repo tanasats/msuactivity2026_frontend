@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Home,
   LayoutDashboard,
+  Megaphone,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -32,6 +33,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'กิจกรรมทุกคณะ',
     Icon: ClipboardList,
     matchPrefix: '/dashboard/admin/activities',
+  },
+  {
+    href: '/dashboard/admin/announcements',
+    label: 'ประกาศเว็บไซต์',
+    Icon: Megaphone,
+    matchPrefix: '/dashboard/admin/announcements',
   },
 ];
 

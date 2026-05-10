@@ -92,6 +92,48 @@ export interface AdminUserSummary {
   updated_at: string;
 }
 
+// ── system settings (super_admin) ────────────────────────────────
+
+export interface SystemSetting {
+  key: string;
+  value: number | string | boolean | null;
+  updated_by: number | null;
+  updated_at: string | null;
+  schema: {
+    type: 'integer';
+    min: number;
+    max: number;
+  };
+}
+
+// ── announcements (admin/super_admin manage, public read) ─────────
+
+export type AnnouncementKind = 'BANNER' | 'POPUP';
+export type AnnouncementSeverity = 'INFO' | 'WARNING' | 'DANGER';
+
+// public-facing — ตัด field ที่ไม่จำเป็นออก (created_by, is_active เพราะกรองแล้ว)
+export interface PublicAnnouncement {
+  id: number;
+  kind: AnnouncementKind;
+  severity: AnnouncementSeverity;
+  title: string | null;
+  body: string;
+  link_url: string | null;
+  link_label: string | null;
+}
+
+// admin view — มี audit fields ครบ
+export interface AdminAnnouncement extends PublicAnnouncement {
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  created_by: number;
+  created_by_name: string;
+  updated_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type UserAuditAction = 'role_change' | 'faculty_change' | 'status_change';
 
 export interface UserAuditLog {

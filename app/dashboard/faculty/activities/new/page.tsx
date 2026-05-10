@@ -1,15 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ActivityForm } from '@/components/faculty/ActivityForm';
 import type { FacultyActivityDetail } from '@/lib/types';
 
+interface AcademicYearsResponse {
+  current: number;
+  available: number[];
+}
+
 export default function NewActivityPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+
+  // current academic year มาจาก backend (เคารพ system_settings.academic_year.start_*)
+  // ใช้เป็น default ของ field academic_year ในฟอร์มสร้างใหม่
+  const [defaultAcademicYear, setDefaultAcademicYear] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<AcademicYearsResponse>('/api/faculty/academic-years')
+      .then((res) => {
+        if (!cancelled) setDefaultAcademicYear(res.data.current);
+      })
+      .catch(() => {
+        // non-fatal — ฟอร์มจะใช้ fallback boundary client-side
+        if (!cancelled) setDefaultAcademicYear(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSave(payload: unknown) {
     setSaving(true);
@@ -40,7 +64,17 @@ export default function NewActivityPage() {
         บันทึกแล้วจะเป็นฉบับร่าง (DRAFT) — แก้ไขได้ก่อนกดส่งให้ admin อนุมัติ
       </p>
 
-      <ActivityForm mode="create" saving={saving} onSave={handleSave} />
+      {/* รอ default ปีจาก backend ก่อนค่อย mount form — กัน flicker / re-init state */}
+      {defaultAcademicYear === null ? (
+        <div className="h-96 animate-pulse rounded-2xl border border-gray-200 bg-white" />
+      ) : (
+        <ActivityForm
+          mode="create"
+          saving={saving}
+          onSave={handleSave}
+          defaultAcademicYear={defaultAcademicYear || undefined}
+        />
+      )}
     </div>
   );
 }

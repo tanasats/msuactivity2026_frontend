@@ -7,6 +7,8 @@ import {
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
+  Megaphone,
+  Settings,
   ShieldCheck,
   Tag,
   Users,
@@ -59,6 +61,12 @@ const NAV_ITEMS: NavItem[] = [
     Icon: Users,
     matchPrefix: '/dashboard/super-admin/users',
   },
+  {
+    href: '/dashboard/super-admin/settings',
+    label: 'ตั้งค่าระบบ',
+    Icon: Settings,
+    matchPrefix: '/dashboard/super-admin/settings',
+  },
 ];
 
 const ADMIN_LINKS: NavItem[] = [
@@ -66,7 +74,13 @@ const ADMIN_LINKS: NavItem[] = [
     href: '/dashboard/admin/activities',
     label: 'จัดการกิจกรรม',
     Icon: ClipboardList,
-    matchPrefix: '/dashboard/admin',
+    matchPrefix: '/dashboard/admin/activities',
+  },
+  {
+    href: '/dashboard/admin/announcements',
+    label: 'ประกาศเว็บไซต์',
+    Icon: Megaphone,
+    matchPrefix: '/dashboard/admin/announcements',
   },
 ];
 

@@ -57,10 +57,16 @@ interface Props {
   initial?: FacultyActivityDetail | null;
   saving: boolean;
   onSave: (payload: unknown) => Promise<void>;
+  // ค่าเริ่มต้น academic_year เมื่อ mode=create — มาจาก backend (/academic-years.current)
+  // ที่ใช้ getCurrentAcademicYearBE() ฝั่ง server (เคารพ system_settings.academic_year.start_*)
+  // ถ้าไม่ส่งมา จะ fallback เป็น 8/1 boundary client-side (กันกรณี API ยังไม่ตอบ)
+  defaultAcademicYear?: number;
 }
 
 // helpers ─────────────────────────────────────────────────────────
-function getCurrentAcademicYearBE(): number {
+// fallback เท่านั้น — caller ควรส่ง defaultAcademicYear มาจาก backend
+// (boundary ฝั่ง server อาจถูก super_admin เปลี่ยน — client guess ไม่ตรง)
+function fallbackAcademicYearBE(): number {
   const now = new Date();
   const month = now.getMonth() + 1;
   const yearAD = month >= 8 ? now.getFullYear() : now.getFullYear() - 1;
@@ -90,7 +96,10 @@ function initialPosterMeta(p: ActivityPoster | null): PosterMeta | null {
   };
 }
 
-function buildInitialValue(initial: FacultyActivityDetail | null | undefined): ActivityFormValue {
+function buildInitialValue(
+  initial: FacultyActivityDetail | null | undefined,
+  defaultAcademicYear: number,
+): ActivityFormValue {
   if (!initial) {
     const startDefault = new Date();
     startDefault.setDate(startDefault.getDate() + 14);
@@ -105,7 +114,7 @@ function buildInitialValue(initial: FacultyActivityDetail | null | undefined): A
       location: '',
       organization_id: null,
       category_id: null,
-      academic_year: getCurrentAcademicYearBE(),
+      academic_year: defaultAcademicYear,
       semester: 2,
       hours: 1,
       loan_hours: 0,
@@ -153,11 +162,17 @@ function buildInitialValue(initial: FacultyActivityDetail | null | undefined): A
 }
 
 // component ──────────────────────────────────────────────────────
-export function ActivityForm({ mode, initial, saving, onSave }: Props) {
+export function ActivityForm({
+  mode,
+  initial,
+  saving,
+  onSave,
+  defaultAcademicYear,
+}: Props) {
   const [refs, setRefs] = useState<RefData | null>(null);
   const [refsError, setRefsError] = useState<string | null>(null);
   const [value, setValue] = useState<ActivityFormValue>(() =>
-    buildInitialValue(initial ?? null),
+    buildInitialValue(initial ?? null, defaultAcademicYear ?? fallbackAcademicYearBE()),
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -531,13 +546,13 @@ export function ActivityForm({ mode, initial, saving, onSave }: Props) {
           </Field>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <Field label="ชั่วโมงกิจกรรม" required hint="ใส่ทศนิยมได้ เช่น 2.5">
+          <Field label="ชั่วโมงกิจกรรม" required hint="0 = ไม่นับชั่วโมง; ใส่ทศนิยมได้ เช่น 2.5">
             <input
               type="number"
               value={value.hours}
               onChange={(e) => setField('hours', Number(e.target.value))}
               className={inputClass}
-              min={0.1}
+              min={0}
               step={0.1}
               required
               disabled={isLimited}
