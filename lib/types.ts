@@ -158,6 +158,25 @@ export interface PublicStats {
   members_count: number;          // สมาชิกใน users (status=active)
 }
 
+// landing-page stats — all-time aggregates + breakdown
+export interface LandingStatsByYear {
+  academic_year: number;
+  work_count: number;
+  completed_count: number;
+}
+export interface LandingStatsByCategory {
+  category_id: number;
+  category_code: number;
+  category_name: string;
+  count: number;
+}
+export interface LandingStats {
+  activities_count: number;            // WORK + COMPLETED รวมทุกปี
+  members_count: number;               // active users
+  by_year: LandingStatsByYear[];       // เรียง academic_year ASC
+  by_category: LandingStatsByCategory[]; // เรียง category_code ASC
+}
+
 export type ActivityStatus =
   | 'DRAFT'
   | 'PENDING_APPROVAL'

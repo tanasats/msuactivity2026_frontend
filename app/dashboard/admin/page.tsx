@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FileEdit,
   HourglassIcon,
+  Layers,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
@@ -159,12 +160,23 @@ export default function AdminOverviewPage() {
         </div>
       )}
 
-      {/* Stats grid — 4 cards ตาม status */}
+      {/* Stats grid — 1 card รวม + 4 cards ตาม status */}
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">
           สถิติกิจกรรม (ทุกคณะ)
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <TotalCard
+            value={
+              statsData
+                ? STATUS_HIGHLIGHTS.reduce(
+                    (sum, h) => sum + statsData.counts[h.status],
+                    0,
+                  )
+                : null
+            }
+            academicYear={academicYear}
+          />
           {STATUS_HIGHLIGHTS.map((h) => (
             <StatusCard
               key={h.status}
@@ -238,6 +250,42 @@ export default function AdminOverviewPage() {
         )}
       </section>
     </div>
+  );
+}
+
+// "รวม" card — สรุปยอดทุก status ของปีที่เลือก
+//   ใช้สี indigo เน้นเป็น highlight + icon Layers (ซ้อนกันสื่อว่ารวมหลาย status)
+//   click → list ทุก status ของปีนั้น (ไม่ filter status)
+function TotalCard({
+  value,
+  academicYear,
+}: {
+  value: number | null;
+  academicYear: number | null;
+}) {
+  const params = new URLSearchParams();
+  if (academicYear !== null) params.set('academic_year', String(academicYear));
+  const href =
+    params.toString() === ''
+      ? '/dashboard/admin/activities'
+      : `/dashboard/admin/activities?${params.toString()}`;
+  return (
+    <Link
+      href={href}
+      className="block rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-4 shadow-sm transition hover:border-indigo-400 hover:shadow-md"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
+          <Layers className="h-5 w-5" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-indigo-700">รวมทั้งหมด</p>
+          <p className="mt-0.5 text-2xl font-bold text-indigo-900">
+            {value === null ? '–' : formatNumber(value)}
+          </p>
+        </div>
+      </div>
+    </Link>
   );
 }
 
