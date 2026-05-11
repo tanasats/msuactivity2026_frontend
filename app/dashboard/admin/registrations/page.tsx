@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  Ban,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
+import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
 import type {
   AdminRegistrationRow,
   EvaluationStatus,
@@ -62,6 +64,13 @@ export default function AdminRegistrationsPage() {
   const [regStatus, setRegStatus] = useState<RegistrationStatus | 'all'>('all');
   const [evalStatus, setEvalStatus] = useState<EvaluationStatus | 'all'>('all');
   const [academicYear, setAcademicYear] = useState<number | 'all'>('all');
+  const [pendingCancel, setPendingCancel] = useState<AdminRegistrationRow | null>(null);
+
+  const ADMIN_CANCELABLE_STATUSES = new Set<RegistrationStatus>([
+    'PENDING_APPROVAL',
+    'REGISTERED',
+    'ATTENDED',
+  ]);
 
   const [faculties, setFaculties] = useState<MasterFaculty[]>([]);
   useEffect(() => {
@@ -328,6 +337,7 @@ export default function AdminRegistrationsPage() {
                   <th className="px-3 py-3 text-left">สถานะ</th>
                   <th className="px-3 py-3 text-left">ผลประเมิน</th>
                   <th className="px-3 py-3 text-right">ชม.</th>
+                  <th className="px-3 py-3 text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -416,6 +426,19 @@ export default function AdminRegistrationsPage() {
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
+                      <td className="px-3 py-2 text-right">
+                        {ADMIN_CANCELABLE_STATUSES.has(r.registration_status) && (
+                          <button
+                            type="button"
+                            onClick={() => setPendingCancel(r)}
+                            className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                            title="ยกเลิกการลงทะเบียน"
+                          >
+                            <Ban className="h-3 w-3" aria-hidden />
+                            ยกเลิก
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -432,6 +455,19 @@ export default function AdminRegistrationsPage() {
           </div>
         )}
       </div>
+
+      {pendingCancel && (
+        <CancelRegistrationDialog
+          registrationId={pendingCancel.registration_id}
+          studentName={pendingCancel.student_name}
+          activityTitle={pendingCancel.activity_title}
+          onClose={() => setPendingCancel(null)}
+          onCancelled={async () => {
+            setPendingCancel(null);
+            await load();
+          }}
+        />
+      )}
     </div>
   );
 }

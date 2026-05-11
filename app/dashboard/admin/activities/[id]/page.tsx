@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  History,
   Loader2,
   MapPin,
+  PencilLine,
   Search,
   ShieldCheck,
   UserCog,
@@ -24,6 +26,7 @@ import { StatusBadge } from '@/components/faculty/StatusBadge';
 import { formatActivityRange, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/lib/store';
 import type {
+  ActivityAuditEntry,
   ActivityStatus,
   AdminActivityDetail,
   AdminUserSummary,
@@ -51,6 +54,8 @@ export default function AdminActivityDetailPage() {
   const [showSetStatus, setShowSetStatus] = useState(false);
   const [targetStatus, setTargetStatus] = useState<ActivityStatus>('DRAFT');
   const [showSetCreator, setShowSetCreator] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -128,6 +133,22 @@ export default function AdminActivityDetailPage() {
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message ?? 'เปลี่ยนผู้สร้างไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function executeEdit(payload: Record<string, unknown>) {
+    if (!id) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/activities/${id}`, payload);
+      toast.success('บันทึกแล้ว');
+      setShowEdit(false);
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'บันทึกไม่สำเร็จ');
     } finally {
       setBusy(false);
     }
@@ -234,10 +255,11 @@ export default function AdminActivityDetailPage() {
           )}
         </p>
 
-        {/* approve/reject buttons — เฉพาะ PENDING_APPROVAL
+        {/* action buttons — approve/reject (PENDING) + แก้ไข (any) + ประวัติ (any)
             + super_admin override "เปลี่ยนสถานะ" — เห็นได้ทุกสถานะ */}
-        {(isPending || isSuperAdmin) && (
-          <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(isPending || isSuperAdmin) && (
+            <>
             {isPending && (
               <>
                 <button
@@ -275,8 +297,28 @@ export default function AdminActivityDetailPage() {
                 เปลี่ยนสถานะ (override)
               </button>
             )}
-          </div>
-        )}
+            </>
+          )}
+          {/* admin/super_admin: แก้ไข + ดูประวัติ — เห็นทุกสถานะ */}
+          <button
+            type="button"
+            onClick={() => setShowEdit(true)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+          >
+            <PencilLine className="h-4 w-4" aria-hidden />
+            แก้ไข
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAudit(true)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <History className="h-4 w-4" aria-hidden />
+            ประวัติ
+          </button>
+        </div>
 
         {/* approval audit trail */}
         {activity.approved_at && (
@@ -563,6 +605,24 @@ export default function AdminActivityDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* admin edit dialog (subset of fields) */}
+      {showEdit && (
+        <AdminEditDialog
+          activity={activity}
+          busy={busy}
+          onClose={() => setShowEdit(false)}
+          onSave={executeEdit}
+        />
+      )}
+
+      {/* audit timeline dialog */}
+      {showAudit && (
+        <AuditDialog
+          activityId={activity.id}
+          onClose={() => setShowAudit(false)}
+        />
       )}
 
       {/* Reject dialog — ใส่เหตุผลก่อน confirm */}
@@ -853,6 +913,395 @@ function ChangeCreatorDialog({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Admin quick-edit dialog ──────────────────────────────────────
+//   field ที่แก้ได้: title, description, location, capacity, hours, loan_hours,
+//                    start_at, end_at, registration_open_at, registration_close_at
+//   ส่งเฉพาะ field ที่เปลี่ยนจริงไป backend (จะได้ log audit เฉพาะที่ต่างจริง)
+function AdminEditDialog({
+  activity,
+  busy,
+  onClose,
+  onSave,
+}: {
+  activity: AdminActivityDetail;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (payload: Record<string, unknown>) => Promise<void>;
+}) {
+  const isoToLocal = (iso: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const localToIso = (l: string) =>
+    l ? new Date(l).toISOString() : null;
+
+  const [v, setV] = useState({
+    title: activity.title,
+    description: activity.description,
+    location: activity.location,
+    capacity: activity.capacity,
+    hours: activity.hours,
+    loan_hours: activity.loan_hours,
+    start_at: isoToLocal(activity.start_at),
+    end_at: isoToLocal(activity.end_at),
+    registration_open_at: isoToLocal(activity.registration_open_at),
+    registration_close_at: isoToLocal(activity.registration_close_at),
+  });
+
+  // คำนวณ payload ที่จะส่ง (เฉพาะ field ที่ต่างจาก initial)
+  function computeChanged() {
+    const out: Record<string, unknown> = {};
+    if (v.title !== activity.title) out.title = v.title;
+    if (v.description !== activity.description) out.description = v.description;
+    if (v.location !== activity.location) out.location = v.location;
+    if (Number(v.capacity) !== activity.capacity) out.capacity = Number(v.capacity);
+    if (Number(v.hours) !== Number(activity.hours)) out.hours = Number(v.hours);
+    if (Number(v.loan_hours) !== Number(activity.loan_hours))
+      out.loan_hours = Number(v.loan_hours);
+    const fields: ('start_at' | 'end_at' | 'registration_open_at' | 'registration_close_at')[] =
+      ['start_at', 'end_at', 'registration_open_at', 'registration_close_at'];
+    for (const f of fields) {
+      const newIso = localToIso(v[f]);
+      if (newIso !== activity[f]) out[f] = newIso;
+    }
+    return out;
+  }
+
+  const changed = computeChanged();
+  const hasChanges = Object.keys(changed).length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <PencilLine className="h-5 w-5 text-indigo-600" aria-hidden />
+            แก้ไขกิจกรรม (admin override)
+          </h2>
+          <p className="mt-1 text-xs text-gray-500">
+            แก้ไขได้ทุกสถานะ — ระบบจะบันทึก audit log ของฟิลด์ที่เปลี่ยน
+          </p>
+        </div>
+
+        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              ชื่อกิจกรรม
+            </label>
+            <input
+              type="text"
+              value={v.title}
+              onChange={(e) => setV({ ...v, title: e.target.value })}
+              maxLength={500}
+              disabled={busy}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              รายละเอียด
+            </label>
+            <textarea
+              rows={4}
+              value={v.description}
+              onChange={(e) => setV({ ...v, description: e.target.value })}
+              disabled={busy}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              สถานที่
+            </label>
+            <input
+              type="text"
+              value={v.location}
+              onChange={(e) => setV({ ...v, location: e.target.value })}
+              disabled={busy}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                จำนวนที่รับ
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={v.capacity}
+                onChange={(e) =>
+                  setV({ ...v, capacity: Number(e.target.value) })
+                }
+                disabled={busy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                ชั่วโมง
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={v.hours}
+                onChange={(e) => setV({ ...v, hours: Number(e.target.value) })}
+                disabled={busy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                ชม. กยศ
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={v.loan_hours}
+                onChange={(e) =>
+                  setV({ ...v, loan_hours: Number(e.target.value) })
+                }
+                disabled={busy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                เริ่มกิจกรรม
+              </label>
+              <input
+                type="datetime-local"
+                value={v.start_at}
+                onChange={(e) => setV({ ...v, start_at: e.target.value })}
+                disabled={busy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                สิ้นสุดกิจกรรม
+              </label>
+              <input
+                type="datetime-local"
+                value={v.end_at}
+                onChange={(e) => setV({ ...v, end_at: e.target.value })}
+                disabled={busy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                เปิดรับสมัคร
+              </label>
+              <input
+                type="datetime-local"
+                value={v.registration_open_at}
+                onChange={(e) =>
+                  setV({ ...v, registration_open_at: e.target.value })
+                }
+                disabled={busy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                ปิดรับสมัคร
+              </label>
+              <input
+                type="datetime-local"
+                value={v.registration_close_at}
+                onChange={(e) =>
+                  setV({ ...v, registration_close_at: e.target.value })
+                }
+                disabled={busy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          {hasChanges && (
+            <div className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+              จะบันทึก {Object.keys(changed).length} ฟิลด์ที่เปลี่ยน:{' '}
+              <span className="font-mono">{Object.keys(changed).join(', ')}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(changed)}
+            disabled={busy || !hasChanges}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'กำลังบันทึก...' : 'บันทึก'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Audit timeline dialog ────────────────────────────────────────
+
+const AUDIT_ACTION_LABEL: Record<ActivityAuditEntry['action'], { text: string; tone: string }> = {
+  submit: { text: 'ส่งอนุมัติ', tone: 'bg-blue-50 text-blue-700' },
+  approve: { text: 'อนุมัติ', tone: 'bg-emerald-50 text-emerald-700' },
+  reject: { text: 'ไม่อนุมัติ', tone: 'bg-rose-50 text-rose-700' },
+  set_status: { text: 'override สถานะ', tone: 'bg-violet-50 text-violet-700' },
+  set_creator: { text: 'เปลี่ยนผู้สร้าง', tone: 'bg-violet-50 text-violet-700' },
+  complete: { text: 'ปิดโครงการ', tone: 'bg-emerald-50 text-emerald-700' },
+  cancel_registration: { text: 'ยกเลิกผู้สมัคร', tone: 'bg-amber-50 text-amber-700' },
+  edit_admin: { text: 'แก้ไขฟิลด์', tone: 'bg-indigo-50 text-indigo-700' },
+  bulk_approve: { text: 'อนุมัติกลุ่ม', tone: 'bg-emerald-50 text-emerald-700' },
+  bulk_reject: { text: 'ไม่อนุมัติกลุ่ม', tone: 'bg-rose-50 text-rose-700' },
+};
+
+function AuditDialog({
+  activityId,
+  onClose,
+}: {
+  activityId: number;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState<ActivityAuditEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<{ items: ActivityAuditEntry[] }>(
+        `/api/admin/activities/${activityId}/audit`,
+      )
+      .then((r) => setItems(r.data.items))
+      .catch((e: unknown) => {
+        const err = e as { response?: { data?: { message?: string } } };
+        setError(err.response?.data?.message ?? 'โหลดไม่สำเร็จ');
+      });
+  }, [activityId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-start justify-between border-b border-gray-100 px-5 py-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <History className="h-5 w-5 text-gray-600" aria-hidden />
+            ประวัติการเปลี่ยนแปลง
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+            aria-label="ปิด"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {error && (
+            <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+              {error}
+            </div>
+          )}
+          {!items && !error && (
+            <p className="text-sm text-gray-500">กำลังโหลด...</p>
+          )}
+          {items && items.length === 0 && (
+            <p className="text-sm text-gray-500">
+              ยังไม่มี audit log สำหรับกิจกรรมนี้
+            </p>
+          )}
+          {items && items.length > 0 && (
+            <ol className="space-y-3">
+              {items.map((l) => {
+                const lbl = AUDIT_ACTION_LABEL[l.action] ?? {
+                  text: l.action,
+                  tone: 'bg-gray-100 text-gray-700',
+                };
+                return (
+                  <li
+                    key={l.id}
+                    className="rounded-xl border border-gray-200 bg-white p-3"
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${lbl.tone}`}
+                      >
+                        {lbl.text}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(l.created_at).toLocaleString('th-TH', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">
+                      โดย <strong>{l.actor_name}</strong>{' '}
+                      <span className="text-gray-400">({l.actor_role})</span>
+                    </p>
+                    {l.note && (
+                      <p className="mt-2 rounded bg-gray-50 px-2 py-1 text-xs italic text-gray-700">
+                        “{l.note}”
+                      </p>
+                    )}
+                    {(l.before || l.after) && (
+                      <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+                        <DiffBlock label="ก่อน" value={l.before} />
+                        <DiffBlock label="หลัง" value={l.after} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiffBlock({
+  label,
+  value,
+}: {
+  label: string;
+  value: Record<string, unknown> | null;
+}) {
+  return (
+    <div className="rounded-lg bg-gray-50 p-2">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </p>
+      {value ? (
+        <pre className="whitespace-pre-wrap break-words font-mono text-[11px] text-gray-700">
+          {JSON.stringify(value, null, 2)}
+        </pre>
+      ) : (
+        <span className="text-xs text-gray-400">—</span>
+      )}
     </div>
   );
 }

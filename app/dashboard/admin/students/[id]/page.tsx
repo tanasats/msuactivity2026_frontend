@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
+  Ban,
   Calendar,
   CheckCircle2,
   Download,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
+import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
 import type {
   AdminStudentDetail,
   AdminStudentRegistration,
@@ -47,6 +49,17 @@ export default function AdminStudentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [yearFilter, setYearFilter] = useState<number | 'all'>('all');
   const [evalFilter, setEvalFilter] = useState<EvaluationStatus | 'all'>('all');
+  const [pendingCancel, setPendingCancel] = useState<AdminStudentRegistration | null>(null);
+
+  async function reload() {
+    if (!id) return;
+    try {
+      const res = await api.get<AdminStudentDetail>(`/api/admin/students/${id}`);
+      setData(res.data);
+    } catch {
+      /* ignore — caller toast */
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -337,17 +350,35 @@ export default function AdminStudentDetailPage() {
                   <th className="px-3 py-3 text-left">สถานะ</th>
                   <th className="px-3 py-3 text-left">ผลประเมิน</th>
                   <th className="px-3 py-3 text-right">ชม.</th>
+                  <th className="px-3 py-3 text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((r) => (
-                  <RegistrationRow key={r.registration_id} r={r} />
+                  <RegistrationRow
+                    key={r.registration_id}
+                    r={r}
+                    onAskCancel={() => setPendingCancel(r)}
+                  />
                 ))}
               </tbody>
             </table>
           </div>
         )}
       </section>
+
+      {pendingCancel && (
+        <CancelRegistrationDialog
+          registrationId={pendingCancel.registration_id}
+          studentName={data.user.full_name}
+          activityTitle={pendingCancel.activity_title}
+          onClose={() => setPendingCancel(null)}
+          onCancelled={async () => {
+            setPendingCancel(null);
+            await reload();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -364,9 +395,22 @@ function BackLink() {
   );
 }
 
-function RegistrationRow({ r }: { r: AdminStudentRegistration }) {
+const ADMIN_CANCELABLE_REG = new Set([
+  'PENDING_APPROVAL',
+  'REGISTERED',
+  'ATTENDED',
+]);
+
+function RegistrationRow({
+  r,
+  onAskCancel,
+}: {
+  r: AdminStudentRegistration;
+  onAskCancel: () => void;
+}) {
   const regLabel = REG_STATUS_LABEL[r.registration_status];
   const evalLabel = r.evaluation_status ? EVAL_LABEL[r.evaluation_status] : null;
+  const canCancel = ADMIN_CANCELABLE_REG.has(r.registration_status);
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-3 py-2 font-mono text-xs text-gray-500">
@@ -419,6 +463,19 @@ function RegistrationRow({ r }: { r: AdminStudentRegistration }) {
           </>
         ) : (
           <span className="text-gray-400">—</span>
+        )}
+      </td>
+      <td className="px-3 py-2 text-right">
+        {canCancel && (
+          <button
+            type="button"
+            onClick={onAskCancel}
+            className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+            title="ยกเลิกการลงทะเบียน"
+          >
+            <Ban className="h-3 w-3" aria-hidden />
+            ยกเลิก
+          </button>
         )}
       </td>
     </tr>

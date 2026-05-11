@@ -214,6 +214,34 @@ export interface AdminStudentDetail {
   registrations: AdminStudentRegistration[];
 }
 
+// activity audit log entry
+export type ActivityAuditAction =
+  | 'submit'
+  | 'approve'
+  | 'reject'
+  | 'set_status'
+  | 'set_creator'
+  | 'complete'
+  | 'cancel_registration'
+  | 'edit_admin'
+  | 'bulk_approve'
+  | 'bulk_reject';
+
+export interface ActivityAuditEntry {
+  id: number;
+  action: ActivityAuditAction;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  note: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  actor_id: number;
+  actor_name: string;
+  actor_email: string;
+  actor_role: UserRole;
+}
+
 // row จาก cross-browse /api/admin/registrations
 export interface AdminRegistrationRow {
   registration_id: number;
