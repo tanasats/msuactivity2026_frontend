@@ -134,6 +134,111 @@ export interface AdminAnnouncement extends PublicAnnouncement {
   updated_at: string;
 }
 
+// ── admin: track student participation ───────────────────────────
+
+export interface AdminStudentSummary {
+  id: number;
+  msu_id: string | null;
+  full_name: string;
+  email: string;
+  faculty_id: number | null;
+  faculty_name: string | null;
+  picture_url: string | null;
+  last_login_at: string | null;
+  hours_total: number;
+  loan_hours_total: number;
+  passed_count: number;
+  registrations_count: number;
+}
+
+export interface AdminStudentAggregateStats {
+  overall: {
+    hours_total: number;
+    loan_hours_total: number;
+    passed_count: number;
+    failed_count: number;
+    pending_eval_count: number;
+    active_count: number;
+  };
+  by_year: {
+    academic_year: number;
+    hours: number;
+    loan_hours: number;
+    passed_count: number;
+  }[];
+  by_category: {
+    category_id: number;
+    category_code: number;
+    category_name: string;
+    hours: number;
+    passed_count: number;
+  }[];
+}
+
+export interface AdminStudentRegistration {
+  registration_id: number;
+  registration_status: RegistrationStatus;
+  evaluation_status: EvaluationStatus | null;
+  evaluation_note: string | null;
+  registered_at: string;
+  attended_at: string | null;
+  activity_id: number;
+  activity_code: string | null;
+  activity_title: string;
+  academic_year: number;
+  semester: number;
+  hours: number;
+  loan_hours: number;
+  activity_status: ActivityStatus;
+  start_at: string;
+  end_at: string;
+  category_name: string;
+  organization_name: string;
+  activity_faculty_name: string | null;
+}
+
+export interface AdminStudentDetail {
+  user: {
+    id: number;
+    msu_id: string | null;
+    email: string;
+    full_name: string;
+    faculty_id: number | null;
+    faculty_name: string | null;
+    picture_url: string | null;
+    status: UserStatus;
+    last_login_at: string | null;
+    created_at: string;
+  };
+  stats: AdminStudentAggregateStats;
+  registrations: AdminStudentRegistration[];
+}
+
+// row จาก cross-browse /api/admin/registrations
+export interface AdminRegistrationRow {
+  registration_id: number;
+  registration_status: RegistrationStatus;
+  evaluation_status: EvaluationStatus | null;
+  registered_at: string;
+  attended_at: string | null;
+  user_id: number;
+  msu_id: string | null;
+  student_name: string;
+  student_email: string;
+  student_faculty_name: string | null;
+  activity_id: number;
+  activity_code: string | null;
+  activity_title: string;
+  academic_year: number;
+  semester: number;
+  hours: number;
+  loan_hours: number;
+  activity_status: ActivityStatus;
+  start_at: string;
+  activity_faculty_name: string | null;
+  category_name: string;
+}
+
 export type UserAuditAction = 'role_change' | 'faculty_change' | 'status_change';
 
 export interface UserAuditLog {

@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   ClipboardList,
+  GraduationCap,
   Home,
   LayoutDashboard,
+  ListChecks,
   Megaphone,
   X,
   type LucideIcon,
@@ -33,6 +35,18 @@ const NAV_ITEMS: NavItem[] = [
     label: 'กิจกรรมทุกคณะ',
     Icon: ClipboardList,
     matchPrefix: '/dashboard/admin/activities',
+  },
+  {
+    href: '/dashboard/admin/students',
+    label: 'นิสิต / การเข้าร่วม',
+    Icon: GraduationCap,
+    matchPrefix: '/dashboard/admin/students',
+  },
+  {
+    href: '/dashboard/admin/registrations',
+    label: 'ค้นข้ามกิจกรรม',
+    Icon: ListChecks,
+    matchPrefix: '/dashboard/admin/registrations',
   },
   {
     href: '/dashboard/admin/announcements',
