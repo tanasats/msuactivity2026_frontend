@@ -11,6 +11,7 @@ import type { ActivityStatus, FacultyActivitySummary } from '@/lib/types';
 
 interface AcademicYearsResponse {
   current: number;
+  default_year: number;
   available: number[];
 }
 
@@ -41,10 +42,12 @@ function FacultyActivitiesPageInner() {
       .then((res) => {
         if (cancelled) return;
         setAvailableYears(res.data.available);
-        // ถ้า URL ยังไม่มี academic_year → default เป็น current ทันที
+        // ถ้า URL ยังไม่มี academic_year → default ไป default_year (max ปีที่คณะมี
+        // activity จริง) — ไม่ใช่ current ตรงๆ กันเคสคณะสร้างกิจกรรมล่วงหน้า
         if (!yearsBootstrapped.current && academicYear === null) {
           yearsBootstrapped.current = true;
-          updateFilter({ academic_year: res.data.current }, true);
+          const def = res.data.default_year ?? res.data.current;
+          updateFilter({ academic_year: def }, true);
         } else {
           yearsBootstrapped.current = true;
         }

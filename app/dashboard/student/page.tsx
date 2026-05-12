@@ -42,6 +42,7 @@ const HISTORY_STATUSES = new Set(['ATTENDED', 'NO_SHOW']);
 
 interface AcademicYearsResponse {
   current: number;
+  default_year: number; // smart default: max ปีที่มีข้อมูล else current
   available: number[];
 }
 
@@ -94,7 +95,9 @@ export default function StudentDashboardPage() {
         );
         if (cancelled) return;
         setAvailableYears(res.data.available);
-        setAcademicYear(res.data.current);
+        // ใช้ default_year (max ของปีที่นิสิตมี registration) แทน current ตรงๆ
+        // — กันเคสนิสิตสมัครกิจกรรมในปีถัดไป แต่ default ปีปัจจุบันแล้วเห็น empty
+        setAcademicYear(res.data.default_year ?? res.data.current);
       } catch (e: unknown) {
         if (cancelled) return;
         const err = e as { response?: { data?: { message?: string } } };

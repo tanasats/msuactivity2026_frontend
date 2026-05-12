@@ -15,6 +15,7 @@ import type {
 
 interface AcademicYearsResponse {
   current: number;
+  default_year: number;
   available: number[];
 }
 
@@ -48,7 +49,7 @@ export default function FacultyOverviewPage() {
         );
         if (cancelled) return;
         setAvailableYears(res.data.available);
-        setAcademicYear(res.data.current);
+        setAcademicYear(res.data.default_year ?? res.data.current);
       } catch (e: unknown) {
         if (cancelled) return;
         const err = e as { response?: { status: number } };
