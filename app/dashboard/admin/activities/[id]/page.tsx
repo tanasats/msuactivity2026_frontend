@@ -932,14 +932,22 @@ function AdminEditDialog({
   onClose: () => void;
   onSave: (payload: Record<string, unknown>) => Promise<void>;
 }) {
+  // robust ต่อข้อมูลผิด: ปี < 1900 / > 2200 หรือ Invalid Date → คืน '' ให้ user กรอกใหม่
   const isoToLocal = (iso: string | null) => {
     if (!iso) return '';
     const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    if (year < 1900 || year > 2200) return '';
+    const yyyy = String(year).padStart(4, '0');
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${yyyy}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
-  const localToIso = (l: string) =>
-    l ? new Date(l).toISOString() : null;
+  const localToIso = (l: string) => {
+    if (!l) return null;
+    const d = new Date(l);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  };
 
   const [v, setV] = useState({
     title: activity.title,
@@ -968,10 +976,24 @@ function AdminEditDialog({
       ['start_at', 'end_at', 'registration_open_at', 'registration_close_at'];
     for (const f of fields) {
       const newIso = localToIso(v[f]);
+      // skip ถ้า input ว่าง/invalid (กัน backend reject — column NOT NULL)
+      // — เคสที่ pre-existing data ผิด (เช่น 0001-01-01) แล้ว user ยังไม่ได้กรอกใหม่
+      if (newIso === null) continue;
       if (newIso !== activity[f]) out[f] = newIso;
     }
     return out;
   }
+
+  // ตรวจ field date ที่ activity เก็บไว้ผิด (year ไม่อยู่ในช่วงปกติ) — เตือน user
+  const invalidDateFields: string[] = [];
+  if (isoToLocal(activity.start_at) === '' && activity.start_at)
+    invalidDateFields.push('วันเริ่มกิจกรรม');
+  if (isoToLocal(activity.end_at) === '' && activity.end_at)
+    invalidDateFields.push('วันสิ้นสุด');
+  if (isoToLocal(activity.registration_open_at) === '' && activity.registration_open_at)
+    invalidDateFields.push('วันเปิดรับสมัคร');
+  if (isoToLocal(activity.registration_close_at) === '' && activity.registration_close_at)
+    invalidDateFields.push('วันปิดรับสมัคร');
 
   const changed = computeChanged();
   const hasChanges = Object.keys(changed).length > 0;
@@ -990,6 +1012,12 @@ function AdminEditDialog({
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          {invalidDateFields.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              ⚠️ กิจกรรมนี้มีฟิลด์วันที่ผิดปกติ (ค่าเดิมอยู่นอกช่วง 1900–2200):{' '}
+              <strong>{invalidDateFields.join(', ')}</strong> — โปรดกรอกค่าใหม่ก่อนบันทึก
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-700">
               ชื่อกิจกรรม
