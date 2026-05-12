@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAuthed } from '@/lib/download';
 import { formatNumber } from '@/lib/format';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
 import type {
@@ -26,8 +27,6 @@ import type {
 
 const PAGE_SIZE = 50;
 const NUMBER_FMT = new Intl.NumberFormat('th-TH');
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
 const REG_STATUS_LABEL: Record<
   RegistrationStatus,
   { text: string; tone: string }
@@ -141,9 +140,8 @@ export default function AdminRegistrationsPage() {
   const fromItem = total === 0 ? 0 : offset + 1;
   const toItem = total !== null ? Math.min(offset + (items?.length ?? 0), total) : 0;
 
-  const csvHref =
-    `${API_BASE}/api/admin/registrations.csv?` +
-    buildParams({
+  function handleDownloadCsv() {
+    const params = buildParams({
       search,
       studentFacultyId,
       activityFacultyId,
@@ -151,6 +149,11 @@ export default function AdminRegistrationsPage() {
       evalStatus,
       academicYear,
     });
+    const url = params
+      ? `/api/admin/registrations.csv?${params}`
+      : '/api/admin/registrations.csv';
+    downloadAuthed(url, 'registrations.csv');
+  }
 
   function clearAll() {
     setSearchInput('');
@@ -179,13 +182,14 @@ export default function AdminRegistrationsPage() {
             ดูรายการลงทะเบียนทั้งหมด · filter ตาม นิสิต / คณะ / สถานะ / ปี
           </p>
         </div>
-        <a
-          href={csvHref}
+        <button
+          type="button"
+          onClick={handleDownloadCsv}
           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           <Download className="h-4 w-4" aria-hidden />
           Export CSV
-        </a>
+        </button>
       </div>
 
       {error && (

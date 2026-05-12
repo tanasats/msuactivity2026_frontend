@@ -15,6 +15,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAuthed } from '@/lib/download';
 import { formatNumber } from '@/lib/format';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
 import type {
@@ -117,9 +118,13 @@ export default function AdminStudentDetailPage() {
   }
 
   const { user, stats } = data;
-  const csvHref = `${
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-  }/api/admin/students/${user.id}/registrations.csv`;
+  // ดาวน์โหลดต้องผ่าน authed fetch (browser navigation ไม่ส่ง Bearer token)
+  function handleDownloadCsv() {
+    downloadAuthed(
+      `/api/admin/students/${user.id}/registrations.csv`,
+      `student-${user.msu_id || user.id}-registrations.csv`,
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl p-6 md:p-8">
@@ -171,13 +176,14 @@ export default function AdminStudentDetailPage() {
               )}
             </div>
           </div>
-          <a
-            href={csvHref}
+          <button
+            type="button"
+            onClick={handleDownloadCsv}
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             <Download className="h-4 w-4" aria-hidden />
             CSV
-          </a>
+          </button>
         </div>
       </div>
 
