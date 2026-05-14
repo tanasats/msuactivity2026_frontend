@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   ExternalLink,
   Loader2,
+  QrCode,
   UserCog,
   UserPlus,
   Users,
@@ -71,6 +72,7 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
+  const [showCheckIn, setShowCheckIn] = useState(false);
   const [showEvaluate, setShowEvaluate] = useState(false);
   const [showRole, setShowRole] = useState(false);
 
@@ -175,6 +177,14 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
           </button>
           <button
             type="button"
+            onClick={() => setShowCheckIn(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+          >
+            <QrCode className="h-4 w-4" aria-hidden />
+            เพิ่มรายชื่อ check-in
+          </button>
+          <button
+            type="button"
             onClick={() => setShowEvaluate(true)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100"
           >
@@ -224,6 +234,20 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
             await loadSummary();
           }}
           successKey="approved"
+        />
+      )}
+      {showCheckIn && manageable && (
+        <BulkMsuIdDialog
+          title="เพิ่มรายชื่อ check-in"
+          subtitle="ใช้กับนิสิตที่อยู่สถานะ 'ลงทะเบียน' — เปลี่ยนเป็น 'เช็คอินแล้ว' + รอประเมิน (กิจกรรมต้องอยู่ใน WORK/COMPLETED)"
+          endpoint={`/api/admin/activities/${activityId}/registrations/bulk-check-in`}
+          confirmLabel="เช็คอิน"
+          confirmTone="blue"
+          onClose={() => setShowCheckIn(false)}
+          onDone={async () => {
+            await loadSummary();
+          }}
+          successKey="checked_in"
         />
       )}
       {showEvaluate && manageable && (
@@ -398,8 +422,8 @@ interface BulkMsuIdDialogProps {
   subtitle: string;
   endpoint: string;
   confirmLabel: string;
-  confirmTone: 'indigo' | 'emerald';
-  successKey: 'added' | 'approved';
+  confirmTone: 'indigo' | 'emerald' | 'blue';
+  successKey: 'added' | 'approved' | 'checked_in';
   onClose: () => void;
   onDone: () => Promise<void>;
 }
@@ -433,6 +457,7 @@ function BulkMsuIdDialog({
       const res = await api.post<{
         added?: ResultRow[];
         approved?: ResultRow[];
+        checked_in?: ResultRow[];
         errors?: ErrorRow[];
       }>(endpoint, { msu_ids: msuIds });
       const successList = (res.data[successKey] ?? []) as ResultRow[];
@@ -452,10 +477,11 @@ function BulkMsuIdDialog({
     }
   }
 
-  const confirmClass =
-    confirmTone === 'indigo'
-      ? 'bg-indigo-600 hover:bg-indigo-700'
-      : 'bg-emerald-600 hover:bg-emerald-700';
+  const confirmClass = {
+    indigo: 'bg-indigo-600 hover:bg-indigo-700',
+    emerald: 'bg-emerald-600 hover:bg-emerald-700',
+    blue: 'bg-blue-600 hover:bg-blue-700',
+  }[confirmTone];
 
   return (
     <DialogShell title={title} subtitle={subtitle} onClose={onClose} busy={busy}>
