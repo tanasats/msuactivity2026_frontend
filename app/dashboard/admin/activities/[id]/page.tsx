@@ -22,6 +22,7 @@ import {
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ParticipantsPanel } from '@/components/admin/ParticipantsPanel';
 import { StatusBadge } from '@/components/faculty/StatusBadge';
 import { formatActivityRange, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/lib/store';
@@ -349,6 +350,11 @@ export default function AdminActivityDetailPage() {
           />
         </div>
       )}
+
+      {/* Participants panel (admin override) */}
+      <div className="mb-5">
+        <ParticipantsPanel activityId={activity.id} />
+      </div>
 
       {/* Quick facts */}
       <div className="mb-5 grid gap-3 rounded-2xl border border-gray-200 bg-white p-5 sm:grid-cols-2">
