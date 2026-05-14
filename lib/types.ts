@@ -46,11 +46,30 @@ export interface MasterCategory {
   updated_at: string;
 }
 
+// แสดงในหน้ารายละเอียดกิจกรรม — child skill + parent info สำหรับ rollup
+//   parent_id/parent_code/parent_name = null กรณีเป็น legacy parent ที่ผูกตรง (S1–S5 เดิม)
+export interface ActivitySkillChip {
+  id: number;
+  code: string;
+  name: string;
+  parent_id: number | null;
+  parent_code: string | null;
+  parent_name: string | null;
+}
+
+// MasterSkill รองรับ hierarchy:
+//   parent: parent_id=null, academic_year=null (รายการแม่ ใช้ข้ามปี)
+//   child:  parent_id=number, academic_year=number (รายการของปีนั้น)
+//   parent_code/parent_name = denormalized จาก JOIN (เฉพาะ child)
 export interface MasterSkill {
   id: number;
   code: string;
   name: string;
+  parent_id: number | null;
+  academic_year: number | null;
   is_active: boolean;
+  parent_code: string | null;
+  parent_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -178,6 +197,7 @@ export interface AdminStudentAggregateStats {
 export interface AdminStudentRegistration {
   registration_id: number;
   registration_status: RegistrationStatus;
+  participant_role: ParticipantRole;
   evaluation_status: EvaluationStatus | null;
   evaluation_note: string | null;
   registered_at: string;
@@ -216,16 +236,26 @@ export interface AdminStudentDetail {
 
 // activity audit log entry
 export type ActivityAuditAction =
+  | 'create'
+  | 'edit'
+  | 'edit_limited'
   | 'submit'
   | 'approve'
   | 'reject'
   | 'set_status'
   | 'set_creator'
   | 'complete'
-  | 'cancel_registration'
   | 'edit_admin'
   | 'bulk_approve'
-  | 'bulk_reject';
+  | 'bulk_reject'
+  | 'approve_registration'
+  | 'cancel_registration'
+  | 'evaluate_registration'
+  | 'staff_check_in'
+  | 'bulk_add_registration'
+  | 'bulk_approve_registration'
+  | 'bulk_evaluate_registration'
+  | 'change_participant_role';
 
 export interface ActivityAuditEntry {
   id: number;
@@ -246,6 +276,7 @@ export interface ActivityAuditEntry {
 export interface AdminRegistrationRow {
   registration_id: number;
   registration_status: RegistrationStatus;
+  participant_role: ParticipantRole;
   evaluation_status: EvaluationStatus | null;
   registered_at: string;
   attended_at: string | null;
@@ -265,6 +296,43 @@ export interface AdminRegistrationRow {
   start_at: string;
   activity_faculty_name: string | null;
   category_name: string;
+}
+
+// master_data_audit_logs — Phase 2 audit สำหรับ super_admin CRUD
+//   target_type: ตารางอะไร
+//   target_id:   id ของ row (null สำหรับ system_setting)
+//   target_key:  key ลำดับสองให้อ่านง่าย (system_setting key, skill code path "2569/S1/K1")
+export type MasterDataAuditTarget =
+  | 'organization'
+  | 'category'
+  | 'skill'
+  | 'faculty'
+  | 'system_setting'
+  | 'announcement';
+
+export type MasterDataAuditAction =
+  | 'create'
+  | 'update'
+  | 'soft_delete'
+  | 'restore'
+  | 'delete';
+
+export interface MasterDataAuditEntry {
+  id: number;
+  action: MasterDataAuditAction;
+  target_type: MasterDataAuditTarget;
+  target_id: number | null;
+  target_key: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  note: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  actor_id: number;
+  actor_name: string;
+  actor_email: string;
+  actor_role: UserRole;
 }
 
 export type UserAuditAction = 'role_change' | 'faculty_change' | 'status_change';
@@ -387,7 +455,7 @@ export interface ActivityDocument {
 
 export interface ActivityDetail extends ActivitySummary {
   description: string;
-  skills: { id: number; code: string; name: string }[];
+  skills: ActivitySkillChip[];
   eligible_faculties: { id: number; code: string; name: string }[];
   poster: ActivityPoster | null;
   poster_url: string | null;
@@ -447,7 +515,7 @@ export interface AdminActivityDetail extends AdminActivitySummary {
   approved_by: number | null;
   approved_by_name: string | null;
   published_at: string | null;
-  skills: { id: number; code: string; name: string }[];
+  skills: ActivitySkillChip[];
   eligible_faculties: { id: number; code: string; name: string }[];
   poster: ActivityPoster | null;
   poster_url: string | null;
@@ -469,7 +537,7 @@ export interface FacultyActivityDetail extends FacultyActivitySummary {
   approved_by: number | null;
   published_at: string | null;
   created_by_faculty_id: number | null;
-  skills: { id: number; code: string; name: string }[];
+  skills: ActivitySkillChip[];
   eligible_faculties: { id: number; code: string; name: string }[];
   poster: ActivityPoster | null;
   poster_url: string | null;
@@ -487,6 +555,12 @@ export type RegistrationStatus =
   | 'REJECTED_BY_STAFF'
   | 'ATTENDED'
   | 'NO_SHOW';
+
+// สถานภาพในกิจกรรม (อิสระจาก users.role)
+//   PARTICIPANT — ผู้เข้าร่วมกิจกรรม (default)
+//   ORGANIZER  — ผู้ดำเนินโครงการ
+//   LEADER     — ผู้รับผิดชอบโครงการ
+export type ParticipantRole = 'PARTICIPANT' | 'ORGANIZER' | 'LEADER';
 
 // ผลประเมินการเข้าร่วมกิจกรรม (เจ้าหน้าที่คณะให้หลังเช็คอิน)
 //   PENDING_EVALUATION = ตั้งอัตโนมัติตอน check-in สำเร็จ
@@ -508,6 +582,7 @@ export interface RegistrationPhoto {
 export interface StudentRegistration {
   registration_id: number;
   registration_status: RegistrationStatus;
+  participant_role: ParticipantRole;
   qr_token: string | null;
   attended_at: string | null;
   attendance_status: 'VALID' | 'INVALID' | 'PENDING_REVIEW' | null;
@@ -566,6 +641,7 @@ export interface BulkEvaluateResult {
 export interface FacultyRegistration {
   registration_id: number;
   registration_status: RegistrationStatus;
+  participant_role: ParticipantRole;
   qr_token: string | null;
   registered_at: string;
   approved_at: string | null;

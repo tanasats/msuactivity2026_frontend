@@ -424,7 +424,7 @@ function ReadOnlyView({ activity }: { activity: FacultyActivityDetail }) {
                 key={s.id}
                 className="rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-800"
               >
-                <span className="font-mono">{s.code}</span> · {s.name}
+                <span className="font-mono">{s.code}</span> · {s.name}xx
               </span>
             ))}
           </div>

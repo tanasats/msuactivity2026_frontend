@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  Plus,
   Search,
   X,
   XCircle,
@@ -391,11 +392,20 @@ function AdminActivitiesPageInner() {
 
   return (
     <div className="mx-auto max-w-full p-6 md:p-8">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">กิจกรรมทุกคณะ</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          ค้นหา กรอง และอนุมัติกิจกรรมจากทุกคณะ
-        </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">กิจกรรมทุกคณะ</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            ค้นหา กรอง และอนุมัติกิจกรรมจากทุกคณะ
+          </p>
+        </div>
+        <Link
+          href="/dashboard/faculty/activities/new"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          สร้างกิจกรรม
+        </Link>
       </div>
 
       {/* Sticky toolbar — filter + search */}

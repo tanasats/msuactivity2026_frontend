@@ -6,6 +6,7 @@ import {
   Building2,
   ClipboardList,
   GraduationCap,
+  History,
   LayoutDashboard,
   ListChecks,
   Megaphone,
@@ -68,6 +69,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'ตั้งค่าระบบ',
     Icon: Settings,
     matchPrefix: '/dashboard/super-admin/settings',
+  },
+  {
+    href: '/dashboard/super-admin/audit',
+    label: 'Audit log',
+    Icon: History,
+    matchPrefix: '/dashboard/super-admin/audit',
   },
 ];
 

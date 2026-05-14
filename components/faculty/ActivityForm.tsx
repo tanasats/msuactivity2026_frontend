@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { ImagePlus, X } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/lib/store';
 import type { ActivityPoster, FacultyActivityDetail } from '@/lib/types';
 
 interface PosterMeta {
@@ -20,6 +21,9 @@ export interface ActivityFormValue {
   title: string;
   description: string;
   location: string;
+  // faculty_id = เจ้าของกิจกรรม (created_by_faculty_id) — กรอกเฉพาะ admin/super_admin
+  //   ตอน create เท่านั้น; faculty_staff จะใช้ req.user.faculty_id อัตโนมัติ
+  faculty_id: number | null;
   organization_id: number | null;
   category_id: number | null;
   academic_year: number;
@@ -45,8 +49,17 @@ export interface ActivityFormValue {
 interface RefData {
   organizations: { id: number; code: string; name: string }[];
   categories: { id: number; code: number; name: string }[];
-  skills: { id: number; code: string; name: string }[];
   faculties: { id: number; code: string; name: string }[];
+}
+
+// child skill ของปี — โหลดแยกตาม value.academic_year (re-fetch เมื่อเปลี่ยนปี)
+interface ChildSkill {
+  id: number;
+  code: string;
+  name: string;
+  parent_id: number;
+  parent_code: string | null;
+  parent_name: string | null;
 }
 
 interface Props {
@@ -112,6 +125,7 @@ function buildInitialValue(
       title: '',
       description: '',
       location: '',
+      faculty_id: null,
       organization_id: null,
       category_id: null,
       academic_year: defaultAcademicYear,
@@ -137,6 +151,7 @@ function buildInitialValue(
     title: initial.title,
     description: initial.description,
     location: initial.location,
+    faculty_id: initial.created_by_faculty_id,
     organization_id: initial.organization_id,
     category_id: initial.category_id,
     academic_year: initial.academic_year,
@@ -169,11 +184,19 @@ export function ActivityForm({
   onSave,
   defaultAcademicYear,
 }: Props) {
+  const userRole = useAuthStore((s) => s.user?.role);
+  // admin/super_admin ที่กำลังสร้างใหม่ → ต้องเลือกคณะของกิจกรรม (ไม่อิง faculty ของตัวเอง)
+  const isAdminCreating =
+    mode === 'create' && (userRole === 'admin' || userRole === 'super_admin');
+
   const [refs, setRefs] = useState<RefData | null>(null);
   const [refsError, setRefsError] = useState<string | null>(null);
   const [value, setValue] = useState<ActivityFormValue>(() =>
     buildInitialValue(initial ?? null, defaultAcademicYear ?? fallbackAcademicYearBE()),
   );
+  // skills ของปี value.academic_year — re-fetch เมื่อปีเปลี่ยน
+  const [yearSkills, setYearSkills] = useState<ChildSkill[] | null>(null);
+  const [skillsLoading, setSkillsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // poster state — แยกจาก ActivityFormValue เพราะ upload เกิดก่อน save (ไม่อยู่ใน controlled fields)
@@ -195,21 +218,18 @@ export function ActivityForm({
     };
   }, []);
 
-  // โหลด dropdown options ครั้งเดียว
+  // โหลด dropdown options ครั้งเดียว (orgs/categories/faculties — ไม่ขึ้นกับปี)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // ทุก endpoint require auth — ใช้ api (มี bearer token)
-        // skills/orgs/categories ใช้ public api ไม่ได้เพราะยัง require auth ตาม master data CRUD
-        const [orgsRes, catsRes, skillsRes, facsRes] = await Promise.all([
+        const [orgsRes, catsRes, facsRes] = await Promise.all([
           api.get<{ items: RefData['organizations'] }>(
             '/api/organizations?is_active=true',
           ),
           api.get<{ items: RefData['categories'] }>(
             '/api/categories?is_active=true',
           ),
-          api.get<{ items: RefData['skills'] }>('/api/skills?is_active=true'),
           api.get<{ items: RefData['faculties'] }>(
             '/api/faculties?is_active=true&category=A',
           ),
@@ -218,7 +238,6 @@ export function ActivityForm({
         setRefs({
           organizations: orgsRes.data.items,
           categories: catsRes.data.items,
-          skills: skillsRes.data.items,
           faculties: facsRes.data.items,
         });
       } catch (e) {
@@ -231,6 +250,44 @@ export function ActivityForm({
       cancelled = true;
     };
   }, []);
+
+  // โหลด skills (child) ของปีที่เลือก — re-fetch เมื่อ academic_year เปลี่ยน
+  //   ปีที่ไม่มี child → list ว่าง → user กดบันทึกไม่ได้ (validate ทักษะ ≥ 1)
+  useEffect(() => {
+    if (!value.academic_year) {
+      setYearSkills(null);
+      return;
+    }
+    let cancelled = false;
+    setSkillsLoading(true);
+    api
+      .get<{ items: ChildSkill[] }>(
+        `/api/skills?scope=child&is_active=true&academic_year=${value.academic_year}`,
+      )
+      .then((res) => {
+        if (cancelled) return;
+        setYearSkills(res.data.items);
+        // เคลียร์ skill_ids ที่ไม่ได้อยู่ใน list ของปีใหม่ (กัน submit แล้ว backend 400)
+        setValue((v) => {
+          const validIds = new Set(res.data.items.map((s) => s.id));
+          const filtered = v.skill_ids.filter((id) => validIds.has(id));
+          return filtered.length === v.skill_ids.length
+            ? v
+            : { ...v, skill_ids: filtered };
+        });
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        console.error(e);
+        setYearSkills([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSkillsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value.academic_year]);
 
   function setField<K extends keyof ActivityFormValue>(
     key: K,
@@ -296,6 +353,11 @@ export function ActivityForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
+    // admin/super_admin สร้างใหม่: ต้องเลือกคณะของกิจกรรมก่อน
+    if (isAdminCreating && !value.faculty_id) {
+      setSubmitError('กรุณาเลือกคณะ/หน่วยงานของกิจกรรม');
+      return;
+    }
     // โหมดเต็ม: ต้องมี poster + อัปโหลดเสร็จ; โหมดจำกัด: ข้ามทั้งสอง
     if (!isLimited) {
       if (!poster) {
@@ -350,6 +412,36 @@ export function ActivityForm({
             ฟิลด์อื่นที่จาง = ล็อกไว้ (ต้องการแก้ ทำได้เฉพาะตอน "ฉบับร่าง")
           </p>
         </div>
+      )}
+
+      {/* Section 0a: เลือกคณะของกิจกรรม — แสดงเฉพาะ admin/super_admin ตอนสร้างใหม่ */}
+      {isAdminCreating && (
+        <Section title="คณะ/หน่วยงานของกิจกรรม">
+          <Field
+            label="คณะ/หน่วยงาน"
+            required
+            hint="เลือกคณะ/หน่วยงานที่เป็นเจ้าของกิจกรรมนี้ (ผูกกิจกรรมไว้ในขอบเขตของคณะ)"
+          >
+            <select
+              value={value.faculty_id ?? ''}
+              onChange={(e) =>
+                setField(
+                  'faculty_id',
+                  e.target.value === '' ? null : Number(e.target.value),
+                )
+              }
+              className={inputClass}
+              required
+            >
+              <option value="">— เลือกคณะ/หน่วยงาน —</option>
+              {refs!.faculties.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </Section>
       )}
 
       {/* Section 0: ภาพโปสเตอร์ — ล็อกตอน limited */}
@@ -680,18 +772,33 @@ export function ActivityForm({
             clearable
           />
         </Field>
-        <Field label="ทักษะที่จะได้รับ" required>
-          <SelectableButtonGrid
-            options={refs!.skills.map((s) => ({
-              id: s.id,
-              label: `${s.code} ${s.name}`,
-            }))}
-            selected={value.skill_ids}
-            onChange={(ids) => setField('skill_ids', ids)}
-            emptyText="กรุณาเลือกอย่างน้อย 1 ทักษะ"
-            countLabel={(n) => `เลือกแล้ว ${n} ทักษะ`}
-            clearable={false}
-          />
+        <Field
+          label="ทักษะที่จะได้รับ"
+          required
+          hint={`รายการของปี ${value.academic_year} (super_admin จัดการแยกต่อปี)`}
+        >
+          {skillsLoading ? (
+            <p className="text-xs text-gray-500">กำลังโหลดทักษะของปีนี้...</p>
+          ) : yearSkills === null || yearSkills.length === 0 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              ยังไม่มีรายการ "ทักษะที่จะได้รับ" ของปี {value.academic_year} — โปรดให้
+              super_admin เพิ่มรายการของปีนี้ก่อนจึงสร้างกิจกรรมได้
+            </p>
+          ) : (
+            <SelectableButtonGrid
+              options={yearSkills.map((s) => ({
+                id: s.id,
+                label: s.parent_code
+                  ? `${s.parent_code}· ${s.name}` 
+                  : `${s.code} ${s.name}`,
+              }))}
+              selected={value.skill_ids}
+              onChange={(ids) => setField('skill_ids', ids)}
+              emptyText="กรุณาเลือกอย่างน้อย 1 ทักษะ"
+              countLabel={(n) => `เลือกแล้ว ${n} ทักษะ`}
+              clearable={false}
+            />
+          )}
         </Field>
       </Section>
 
@@ -772,6 +879,9 @@ function buildPayload(v: ActivityFormValue) {
     title: v.title,
     description: v.description,
     location: v.location,
+    // faculty_id ส่งเฉพาะตอน admin/super_admin เลือกคณะของกิจกรรมเอง
+    // (backend จะ ignore สำหรับ faculty_staff และใช้ req.user.faculty_id แทน)
+    ...(v.faculty_id ? { faculty_id: v.faculty_id } : {}),
     organization_id: v.organization_id,
     category_id: v.category_id,
     academic_year: v.academic_year,

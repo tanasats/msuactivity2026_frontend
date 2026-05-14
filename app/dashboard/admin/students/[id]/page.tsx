@@ -17,6 +17,7 @@ import {
 import { api } from '@/lib/api';
 import { downloadAuthed } from '@/lib/download';
 import { formatNumber } from '@/lib/format';
+import { PARTICIPANT_ROLE_LABEL } from '@/lib/participant-role';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
 import type {
   AdminStudentDetail,
@@ -438,11 +439,20 @@ function RegistrationRow({
         {r.academic_year}/{r.semester}
       </td>
       <td className="px-3 py-2">
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${regLabel.tone}`}
-        >
-          {regLabel.text}
-        </span>
+        <div className="flex flex-wrap items-center gap-1">
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${regLabel.tone}`}
+          >
+            {regLabel.text}
+          </span>
+          {r.participant_role && r.participant_role !== 'PARTICIPANT' && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${PARTICIPANT_ROLE_LABEL[r.participant_role].tone}`}
+            >
+              {PARTICIPANT_ROLE_LABEL[r.participant_role].short}
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-3 py-2">
         {evalLabel ? (

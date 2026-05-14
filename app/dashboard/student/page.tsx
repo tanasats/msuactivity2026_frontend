@@ -25,6 +25,7 @@ import {
   formatActivityRange,
   formatNumber,
 } from '@/lib/format';
+import { PARTICIPANT_ROLE_LABEL } from '@/lib/participant-role';
 import type {
   EvaluationStatus,
   RegistrationPhoto,
@@ -399,6 +400,14 @@ function ActiveCard({
                 อนุมัติเข้าร่วม
               </span>
             )}
+            {/* แสดง participant_role เฉพาะถ้าไม่ใช่ default */}
+            {reg.participant_role && reg.participant_role !== 'PARTICIPANT' && (
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${PARTICIPANT_ROLE_LABEL[reg.participant_role].tone}`}
+              >
+                {PARTICIPANT_ROLE_LABEL[reg.participant_role].short}
+              </span>
+            )}
           </div>
           <h3 className="mb-1 text-base font-semibold text-gray-900">
             {reg.title}
@@ -531,6 +540,13 @@ function HistoryRow({ reg }: { reg: StudentRegistration }) {
           >
             ผลประเมิน: {resultLabel.text}
           </span>
+          {reg.participant_role && reg.participant_role !== 'PARTICIPANT' && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${PARTICIPANT_ROLE_LABEL[reg.participant_role].tone}`}
+            >
+              {PARTICIPANT_ROLE_LABEL[reg.participant_role].short}
+            </span>
+          )}
         </div>
         <p className="truncate text-sm font-medium text-gray-900">
           {reg.title}

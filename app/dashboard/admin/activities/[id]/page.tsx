@@ -205,7 +205,7 @@ export default function AdminActivityDetailPage() {
   const isPending = activity.status === 'PENDING_APPROVAL';
 
   return (
-    <div className="mx-auto max-w-5xl p-6 md:p-8">
+    <div className="mx-auto max-w-full p-6 md:p-8">
       <Link
         href="/dashboard/admin/activities"
         className="mb-4 inline-block text-sm text-indigo-600 hover:underline"
@@ -351,9 +351,9 @@ export default function AdminActivityDetailPage() {
         </div>
       )}
 
-      {/* Participants panel (admin override) */}
+      {/* Participants panel — admin เห็น stats; super_admin จัดการได้ */}
       <div className="mb-5">
-        <ParticipantsPanel activityId={activity.id} />
+        <ParticipantsPanel activityId={activity.id} manageable={isSuperAdmin} />
       </div>
 
       {/* Quick facts */}
@@ -1275,16 +1275,26 @@ function AdminEditDialog({
 // ── Audit timeline dialog ────────────────────────────────────────
 
 const AUDIT_ACTION_LABEL: Record<ActivityAuditEntry['action'], { text: string; tone: string }> = {
+  create: { text: 'สร้างกิจกรรม', tone: 'bg-blue-50 text-blue-700' },
+  edit: { text: 'แก้ไขกิจกรรม', tone: 'bg-indigo-50 text-indigo-700' },
+  edit_limited: { text: 'แก้ไข (โหมดจำกัด)', tone: 'bg-indigo-50 text-indigo-700' },
   submit: { text: 'ส่งอนุมัติ', tone: 'bg-blue-50 text-blue-700' },
   approve: { text: 'อนุมัติ', tone: 'bg-emerald-50 text-emerald-700' },
   reject: { text: 'ไม่อนุมัติ', tone: 'bg-rose-50 text-rose-700' },
   set_status: { text: 'override สถานะ', tone: 'bg-violet-50 text-violet-700' },
   set_creator: { text: 'เปลี่ยนผู้สร้าง', tone: 'bg-violet-50 text-violet-700' },
   complete: { text: 'ปิดโครงการ', tone: 'bg-emerald-50 text-emerald-700' },
-  cancel_registration: { text: 'ยกเลิกผู้สมัคร', tone: 'bg-amber-50 text-amber-700' },
-  edit_admin: { text: 'แก้ไขฟิลด์', tone: 'bg-indigo-50 text-indigo-700' },
+  edit_admin: { text: 'admin แก้ไขฟิลด์', tone: 'bg-indigo-50 text-indigo-700' },
   bulk_approve: { text: 'อนุมัติกลุ่ม', tone: 'bg-emerald-50 text-emerald-700' },
   bulk_reject: { text: 'ไม่อนุมัติกลุ่ม', tone: 'bg-rose-50 text-rose-700' },
+  approve_registration: { text: 'อนุมัติผู้สมัคร', tone: 'bg-emerald-50 text-emerald-700' },
+  cancel_registration: { text: 'ยกเลิกผู้สมัคร', tone: 'bg-amber-50 text-amber-700' },
+  evaluate_registration: { text: 'ประเมินผู้สมัคร', tone: 'bg-violet-50 text-violet-700' },
+  staff_check_in: { text: 'เจ้าหน้าที่เช็คอินแทน', tone: 'bg-blue-50 text-blue-700' },
+  bulk_add_registration: { text: 'เพิ่มผู้สมัครหลายคน', tone: 'bg-blue-50 text-blue-700' },
+  bulk_approve_registration: { text: 'อนุมัติผู้สมัครหลายคน', tone: 'bg-emerald-50 text-emerald-700' },
+  bulk_evaluate_registration: { text: 'ประเมินหลายคน', tone: 'bg-violet-50 text-violet-700' },
+  change_participant_role: { text: 'เปลี่ยนสถานภาพในกิจกรรม', tone: 'bg-amber-50 text-amber-700' },
 };
 
 function AuditDialog({

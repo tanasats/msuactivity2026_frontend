@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   QrCode,
   Search,
+  UserCog,
   UserPlus,
   X,
   XCircle,
@@ -20,10 +21,15 @@ import { BulkAddDialog } from '@/components/faculty/BulkAddDialog';
 import { BulkEvaluateDialog } from '@/components/faculty/BulkEvaluateDialog';
 import { EvaluateDialog } from '@/components/faculty/EvaluateDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import {
+  PARTICIPANT_ROLE_LABEL,
+  PARTICIPANT_ROLE_ORDER,
+} from '@/lib/participant-role';
 import type {
   EvaluationStatus,
   FacultyActivityDetail,
   FacultyRegistration,
+  ParticipantRole,
   RegistrationStatus,
 } from '@/lib/types';
 
@@ -83,6 +89,7 @@ export default function FacultyRegistrationsPage() {
   const [canManage, setCanManage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | ParticipantRole>('all');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('time_asc');
   const [page, setPage] = useState(1);
@@ -108,6 +115,7 @@ export default function FacultyRegistrationsPage() {
   const [bulkEvaluateResult, setBulkEvaluateResult] = useState<
     'PASSED' | 'FAILED' | null
   >(null);
+  const [showBulkRole, setShowBulkRole] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -140,18 +148,25 @@ export default function FacultyRegistrationsPage() {
     return items.filter((r) => allowed.includes(r.registration_status));
   }, [items, filter]);
 
+  // 1b. filter ตาม participant_role
+  const roleFilteredItems = useMemo(() => {
+    if (!filteredItems) return null;
+    if (roleFilter === 'all') return filteredItems;
+    return filteredItems.filter((r) => r.participant_role === roleFilter);
+  }, [filteredItems, roleFilter]);
+
   // 2. filter ตาม search query (ชื่อ / msu_id / email — case-insensitive substring)
   const searchedItems = useMemo(() => {
-    if (!filteredItems) return null;
+    if (!roleFilteredItems) return null;
     const q = search.trim().toLowerCase();
-    if (!q) return filteredItems;
-    return filteredItems.filter((r) => {
+    if (!q) return roleFilteredItems;
+    return roleFilteredItems.filter((r) => {
       if (r.student_name.toLowerCase().includes(q)) return true;
       if (r.msu_id && r.msu_id.toLowerCase().includes(q)) return true;
       if (r.email.toLowerCase().includes(q)) return true;
       return false;
     });
-  }, [filteredItems, search]);
+  }, [roleFilteredItems, search]);
 
   // 3. sort ตาม sortKey
   const sortedItems = useMemo(() => {
@@ -226,12 +241,12 @@ export default function FacultyRegistrationsPage() {
   // เคลียร์ selection ทุกครั้งที่ filter เปลี่ยน — กันสับสนระหว่าง tab
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filter]);
+  }, [filter, roleFilter]);
 
   // reset page เมื่อ filter / search / sort / pageSize เปลี่ยน
   useEffect(() => {
     setPage(1);
-  }, [filter, search, sortKey, pageSize]);
+  }, [filter, roleFilter, search, sortKey, pageSize]);
 
   // keyboard shortcut: '/' focus search, Esc clear search/selection
   useEffect(() => {
@@ -364,6 +379,41 @@ export default function FacultyRegistrationsPage() {
     }
   }
 
+  async function executeBulkRole(role: ParticipantRole) {
+    if (!id) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBusy(true);
+    try {
+      const res = await api.post<{
+        status: 'ok';
+        updated: number[];
+        skipped: number[];
+      }>(`/api/faculty/activities/${id}/registrations/bulk-participant-role`, {
+        registration_ids: ids,
+        role,
+      });
+      const { updated, skipped } = res.data;
+      if (skipped.length === 0) {
+        toast.success(
+          `เปลี่ยนสถานภาพเป็น "${PARTICIPANT_ROLE_LABEL[role].short}" แล้ว ${updated.length} คน`,
+        );
+      } else {
+        toast.success(
+          `เปลี่ยนสถานภาพ ${updated.length} คน — ข้าม ${skipped.length} (สถานะไม่อนุญาต)`,
+        );
+      }
+      setShowBulkRole(false);
+      setSelectedIds(new Set());
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'ดำเนินการไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function executeCancel() {
     if (!pendingCancel || !id) return;
     setBusy(true);
@@ -400,7 +450,7 @@ export default function FacultyRegistrationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-6 md:p-8">
+    <div className="mx-auto max-w-full p-6 md:p-8">
       <Link
         href={`/dashboard/faculty/activities/${id}`}
         className="mb-4 inline-block text-sm text-blue-600 hover:underline"
@@ -508,6 +558,23 @@ export default function FacultyRegistrationsPage() {
               </kbd>
             )}
           </div>
+
+          {/* Role filter */}
+          <select
+            value={roleFilter}
+            onChange={(e) =>
+              setRoleFilter(e.target.value as 'all' | ParticipantRole)
+            }
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            aria-label="กรองตามสถานภาพในกิจกรรม"
+          >
+            <option value="all">สถานภาพทั้งหมด</option>
+            {PARTICIPANT_ROLE_ORDER.map((r) => (
+              <option key={r} value={r}>
+                {PARTICIPANT_ROLE_LABEL[r].text}
+              </option>
+            ))}
+          </select>
 
           {/* Sort */}
           <select
@@ -646,6 +713,15 @@ export default function FacultyRegistrationsPage() {
             )}
             <button
               type="button"
+              onClick={() => setShowBulkRole(true)}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              <UserCog className="h-3.5 w-3.5" aria-hidden />
+              เปลี่ยนสถานภาพ
+            </button>
+            <button
+              type="button"
               onClick={() => setSelectedIds(new Set())}
               className="rounded-md border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
             >
@@ -683,6 +759,7 @@ export default function FacultyRegistrationsPage() {
                     คณะ
                   </th>
                   <th className="px-4 py-3 text-left">สถานะ</th>
+                  <th className="px-4 py-3 text-left">สถานภาพในกิจกรรม</th>
                   <th className="px-4 py-3 text-left">ผลประเมิน</th>
                   <th className="hidden px-4 py-3 text-left lg:table-cell">
                     สมัครเมื่อ
@@ -819,6 +896,83 @@ export default function FacultyRegistrationsPage() {
           load();
         }}
       />
+
+      {showBulkRole && (
+        <BulkRoleDialog
+          count={selectedIds.size}
+          busy={busy}
+          onSelect={executeBulkRole}
+          onClose={() => setShowBulkRole(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function BulkRoleDialog({
+  count,
+  busy,
+  onSelect,
+  onClose,
+}: {
+  count: number;
+  busy: boolean;
+  onSelect: (role: ParticipantRole) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-start justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">
+              เปลี่ยนสถานภาพ {count} คน
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-500">
+              เลือกสถานภาพใหม่ — ระบบจะข้ามรายการที่ไม่อยู่ในสถานะ active
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="ปิด"
+            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-40"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-2 px-5 py-4">
+          {PARTICIPANT_ROLE_ORDER.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => onSelect(r)}
+              disabled={busy}
+              className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-left text-sm hover:border-amber-400 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="font-medium text-gray-900">
+                {PARTICIPANT_ROLE_LABEL[r].text}
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PARTICIPANT_ROLE_LABEL[r].tone}`}
+              >
+                {PARTICIPANT_ROLE_LABEL[r].short}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            ยกเลิก
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -848,6 +1002,7 @@ function RegistrationRow({
   const isPending = reg.registration_status === 'PENDING_APPROVAL';
   const isRegistered = reg.registration_status === 'REGISTERED';
   const isAttended = reg.registration_status === 'ATTENDED';
+  const roleMeta = PARTICIPANT_ROLE_LABEL[reg.participant_role];
   const evalMeta = reg.evaluation_status
     ? EVALUATION_LABELS[reg.evaluation_status]
     : null;
@@ -888,6 +1043,13 @@ function RegistrationRow({
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.tone}`}
         >
           {meta.th}
+        </span>
+      </td>
+      <td className="px-4 py-3 align-top">
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${roleMeta.tone}`}
+        >
+          {roleMeta.short}
         </span>
       </td>
       <td className="px-4 py-3 align-top">

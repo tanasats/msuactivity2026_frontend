@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/lib/store';
 import { ActivityForm } from '@/components/faculty/ActivityForm';
 import type { FacultyActivityDetail } from '@/lib/types';
 
@@ -14,6 +15,8 @@ interface AcademicYearsResponse {
 
 export default function NewActivityPage() {
   const router = useRouter();
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdminRole = role === 'admin' || role === 'super_admin';
   const [saving, setSaving] = useState(false);
 
   // current academic year มาจาก backend (เคารพ system_settings.academic_year.start_*)
@@ -42,16 +45,24 @@ export default function NewActivityPage() {
         '/api/faculty/activities',
         payload,
       );
-      router.replace(`/dashboard/faculty/activities/${res.data.id}`);
+      // admin/super_admin → ไปหน้ารายละเอียดฝั่ง admin (ไม่ใช่ /faculty/ ที่ scope ตามคณะ)
+      const detailPath = isAdminRole
+        ? `/dashboard/admin/activities/${res.data.id}`
+        : `/dashboard/faculty/activities/${res.data.id}`;
+      router.replace(detailPath);
     } finally {
       setSaving(false);
     }
   }
 
+  const backHref = isAdminRole
+    ? '/dashboard/admin/activities'
+    : '/dashboard/faculty/activities';
+
   return (
     <div className="mx-auto max-w-full p-6 md:p-8">
       <Link
-        href="/dashboard/faculty/activities"
+        href={backHref}
         className="mb-4 inline-block text-sm text-blue-600 hover:underline"
       >
         ← กลับรายการกิจกรรม

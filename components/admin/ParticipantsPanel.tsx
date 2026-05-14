@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   ExternalLink,
   Loader2,
+  UserCog,
   UserPlus,
   Users,
   X,
@@ -15,9 +16,17 @@ import {
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { formatNumber } from '@/lib/format';
+import {
+  PARTICIPANT_ROLE_LABEL,
+  PARTICIPANT_ROLE_ORDER,
+} from '@/lib/participant-role';
+import type { ParticipantRole } from '@/lib/types';
 
 interface Props {
   activityId: number;
+  // manageable = true → โชว์ปุ่ม 3 ปุ่ม + hint (super_admin only)
+  //              false → โชว์เฉพาะ stats + link ดูรายชื่อ
+  manageable: boolean;
 }
 
 type ErrorReason =
@@ -58,11 +67,12 @@ const ERROR_LABEL: Record<ErrorReason, string> = {
   NOT_OPEN: 'กิจกรรมยังไม่อยู่ในสถานะที่รับสมัคร',
 };
 
-export function ParticipantsPanel({ activityId }: Props) {
+export function ParticipantsPanel({ activityId, manageable }: Props) {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
   const [showEvaluate, setShowEvaluate] = useState(false);
+  const [showRole, setShowRole] = useState(false);
 
   async function loadSummary() {
     try {
@@ -123,7 +133,7 @@ export function ParticipantsPanel({ activityId }: Props) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
           <Users className="h-5 w-5 text-indigo-600" aria-hidden />
-          จัดการผู้สมัคร (admin override)
+          {manageable ? 'จัดการผู้สมัคร (super_admin override)' : 'ผู้สมัคร'}
         </h2>
         <Link
           href={`/dashboard/admin/registrations?activity_id=${activityId}`}
@@ -144,39 +154,51 @@ export function ParticipantsPanel({ activityId }: Props) {
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-        >
-          <UserPlus className="h-4 w-4" aria-hidden />
-          เพิ่มผู้สมัคร
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowApprove(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-        >
-          <CheckCircle2 className="h-4 w-4" aria-hidden />
-          อนุมัติทีละหลายคน
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowEvaluate(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100"
-        >
-          <ClipboardCheck className="h-4 w-4" aria-hidden />
-          ประเมินผลทีละหลายคน
-        </button>
-      </div>
+      {/* Actions — super_admin only: เพิ่ม/อนุมัติ/ประเมิน/เปลี่ยนสถานภาพ */}
+      {manageable && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+          >
+            <UserPlus className="h-4 w-4" aria-hidden />
+            เพิ่มผู้สมัคร
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowApprove(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+          >
+            <CheckCircle2 className="h-4 w-4" aria-hidden />
+            อนุมัติทีละหลายคน
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowEvaluate(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100"
+          >
+            <ClipboardCheck className="h-4 w-4" aria-hidden />
+            ประเมินผลทีละหลายคน
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowRole(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+          >
+            <UserCog className="h-4 w-4" aria-hidden />
+            เปลี่ยนสถานภาพ
+          </button>
+        </div>
+      )}
+      {manageable && (
+        <p className="mt-3 text-xs text-gray-500">
+          ใส่รหัสนิสิต (11 หลัก) — แยกด้วย <strong>ขึ้นบรรทัดใหม่</strong>,{' '}
+          <strong>เว้นวรรค</strong>, หรือ <strong>คอมมา</strong> ก็ได้
+        </p>
+      )}
 
-      <p className="mt-3 text-xs text-gray-500">
-        ใส่รหัสนิสิต (11 หลัก) — แยกด้วย <strong>ขึ้นบรรทัดใหม่</strong>, <strong>เว้นวรรค</strong>, หรือ <strong>คอมมา</strong> ก็ได้
-      </p>
-
-      {showAdd && (
+      {showAdd && manageable && (
         <BulkMsuIdDialog
           title="เพิ่มผู้สมัคร"
           subtitle="ลงทะเบียนนิสิตเข้ากิจกรรมโดยตรง (REGISTERED ทันที, ข้าม window check)"
@@ -190,7 +212,7 @@ export function ParticipantsPanel({ activityId }: Props) {
           successKey="added"
         />
       )}
-      {showApprove && (
+      {showApprove && manageable && (
         <BulkMsuIdDialog
           title="อนุมัติผู้สมัคร"
           subtitle="ใช้กับนิสิตที่อยู่สถานะ 'รออนุมัติ' — เปลี่ยนเป็น 'ลงทะเบียน' + สร้าง QR"
@@ -204,7 +226,7 @@ export function ParticipantsPanel({ activityId }: Props) {
           successKey="approved"
         />
       )}
-      {showEvaluate && (
+      {showEvaluate && manageable && (
         <BulkEvaluateDialog
           activityId={activityId}
           onClose={() => setShowEvaluate(false)}
@@ -213,7 +235,136 @@ export function ParticipantsPanel({ activityId }: Props) {
           }}
         />
       )}
+      {showRole && manageable && (
+        <BulkRoleDialog
+          activityId={activityId}
+          onClose={() => setShowRole(false)}
+          onDone={async () => {
+            await loadSummary();
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+// ── BulkRoleDialog (เปลี่ยน participant_role) ───────────────────
+
+function BulkRoleDialog({
+  activityId,
+  onClose,
+  onDone,
+}: {
+  activityId: number;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const [input, setInput] = useState('');
+  const [role, setRole] = useState<ParticipantRole>('ORGANIZER');
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<{
+    successCount: number;
+    errors: ErrorRow[];
+  } | null>(null);
+
+  const msuIds = useMemo(() => parseMsuIds(input), [input]);
+
+  async function execute() {
+    if (msuIds.length === 0) {
+      toast.error('กรุณาใส่รหัสนิสิต');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.post<{
+        updated: ResultRow[];
+        errors?: ErrorRow[];
+      }>(
+        `/api/admin/activities/${activityId}/registrations/bulk-participant-role`,
+        { msu_ids: msuIds, role },
+      );
+      const successList = res.data.updated ?? [];
+      const errs = res.data.errors ?? [];
+      setOutcome({ successCount: successList.length, errors: errs });
+      if (successList.length > 0) {
+        toast.success(
+          `เปลี่ยนสถานภาพเป็น "${PARTICIPANT_ROLE_LABEL[role].short}" สำเร็จ ${successList.length} รายการ`,
+        );
+        await onDone();
+      } else if (errs.length > 0) {
+        toast.error('ไม่มีรายการที่ดำเนินการสำเร็จ');
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'ดำเนินการไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <DialogShell
+      title="เปลี่ยนสถานภาพผู้เข้าร่วม"
+      subtitle="ตั้ง PARTICIPANT / ORGANIZER / LEADER ให้กับนิสิตในกิจกรรมนี้"
+      onClose={onClose}
+      busy={busy}
+    >
+      <div className="px-5 py-4">
+        <label className="mb-2 block text-xs font-medium text-gray-700">
+          สถานภาพใหม่
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {PARTICIPANT_ROLE_ORDER.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRole(r)}
+              disabled={busy}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                role === r
+                  ? 'border-amber-500 bg-amber-100 text-amber-900'
+                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {PARTICIPANT_ROLE_LABEL[r].text}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <MsuIdsTextarea
+        value={input}
+        onChange={setInput}
+        count={msuIds.length}
+        disabled={busy}
+      />
+
+      {outcome && (
+        <ResultPanel
+          result={{ successCount: outcome.successCount, errors: outcome.errors }}
+        />
+      )}
+
+      <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={busy}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {outcome ? 'ปิด' : 'ยกเลิก'}
+        </button>
+        <button
+          type="button"
+          onClick={execute}
+          disabled={busy || msuIds.length === 0}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+          {busy ? 'กำลังดำเนินการ...' : `บันทึก (${msuIds.length})`}
+        </button>
+      </div>
+    </DialogShell>
   );
 }
 

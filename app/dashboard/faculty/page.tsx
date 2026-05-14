@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar } from 'lucide-react';
+import {
+  Calendar,
+  CheckCircle2,
+  ClipboardList,
+  FileEdit,
+  HourglassIcon,
+  Layers,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { formatNumber } from '@/lib/format';
@@ -19,11 +26,36 @@ interface AcademicYearsResponse {
   available: number[];
 }
 
-const STATUS_HIGHLIGHTS: { status: ActivityStatus; label: string }[] = [
-  { status: 'DRAFT', label: 'ฉบับร่าง' },
-  { status: 'PENDING_APPROVAL', label: 'รออนุมัติ' },
-  { status: 'WORK', label: 'ดำเนินการ' },
-  { status: 'COMPLETED', label: 'เสร็จสิ้น' },
+const STATUS_HIGHLIGHTS: {
+  status: ActivityStatus;
+  label: string;
+  Icon: typeof FileEdit;
+  iconClass: string;
+}[] = [
+  {
+    status: 'DRAFT',
+    label: 'ฉบับร่าง',
+    Icon: FileEdit,
+    iconClass: 'bg-gray-100 text-gray-600',
+  },
+  {
+    status: 'PENDING_APPROVAL',
+    label: 'รออนุมัติ',
+    Icon: HourglassIcon,
+    iconClass: 'bg-amber-100 text-amber-700',
+  },
+  {
+    status: 'WORK',
+    label: 'ดำเนินการ',
+    Icon: ClipboardList,
+    iconClass: 'bg-emerald-100 text-emerald-700',
+  },
+  {
+    status: 'COMPLETED',
+    label: 'เสร็จสิ้น',
+    Icon: CheckCircle2,
+    iconClass: 'bg-slate-200 text-slate-700',
+  },
 ];
 
 export default function FacultyOverviewPage() {
@@ -156,16 +188,30 @@ export default function FacultyOverviewPage() {
         </div>
       )}
 
-      {/* Stats grid */}
+      {/* Stats grid — รูปแบบเดียวกับ admin: 1 Total + 4 status (icon + label + value) */}
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">งานของฉัน</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <TotalCard
+            value={
+              stats
+                ? STATUS_HIGHLIGHTS.reduce(
+                    (sum, h) => sum + stats.mine[h.status],
+                    0,
+                  )
+                : null
+            }
+            context="mine"
+            academicYear={academicYear}
+          />
           {STATUS_HIGHLIGHTS.map((h) => (
-            <StatCard
+            <StatusCard
               key={h.status}
               label={h.label}
               value={stats ? stats.mine[h.status] : null}
               status={h.status}
+              Icon={h.Icon}
+              iconClass={h.iconClass}
               context="mine"
               academicYear={academicYear}
             />
@@ -175,13 +221,27 @@ export default function FacultyOverviewPage() {
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">งานทั้งคณะ</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <TotalCard
+            value={
+              stats
+                ? STATUS_HIGHLIGHTS.reduce(
+                    (sum, h) => sum + stats.faculty[h.status],
+                    0,
+                  )
+                : null
+            }
+            context="faculty"
+            academicYear={academicYear}
+          />
           {STATUS_HIGHLIGHTS.map((h) => (
-            <StatCard
+            <StatusCard
               key={h.status}
               label={h.label}
               value={stats ? stats.faculty[h.status] : null}
               status={h.status}
+              Icon={h.Icon}
+              iconClass={h.iconClass}
               context="faculty"
               academicYear={academicYear}
             />
@@ -271,16 +331,59 @@ function Container({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto max-w-full p-6 md:p-8">{children}</div>;
 }
 
-function StatCard({
+// "รวม" card — สรุปยอดทุก status ของปีที่เลือก (เน้นเป็น highlight สีฟ้า)
+//   context='mine'    → link พร้อม mine=true
+//   context='faculty' → link ไม่ใส่ mine (ทั้งคณะ)
+function TotalCard({
+  value,
+  context,
+  academicYear,
+}: {
+  value: number | null;
+  context: 'mine' | 'faculty';
+  academicYear: number | null;
+}) {
+  const params = new URLSearchParams();
+  if (context === 'mine') params.set('mine', 'true');
+  if (academicYear !== null) params.set('academic_year', String(academicYear));
+  const href =
+    params.toString() === ''
+      ? '/dashboard/faculty/activities'
+      : `/dashboard/faculty/activities?${params.toString()}`;
+  return (
+    <Link
+      href={href}
+      className="block rounded-2xl border-2 border-blue-200 bg-blue-50/50 p-4 shadow-sm transition hover:border-blue-400 hover:shadow-md"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
+          <Layers className="h-5 w-5" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-blue-700">รวมทั้งหมด</p>
+          <p className="mt-0.5 text-2xl font-bold text-blue-900">
+            {value === null ? '–' : formatNumber(value)}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function StatusCard({
   label,
   value,
   status,
+  Icon,
+  iconClass,
   context,
   academicYear,
 }: {
   label: string;
   value: number | null;
   status: ActivityStatus;
+  Icon: typeof FileEdit;
+  iconClass: string;
   context: 'mine' | 'faculty';
   academicYear: number | null;
 }) {
@@ -292,10 +395,19 @@ function StatCard({
       href={`/dashboard/faculty/activities?${params.toString()}`}
       className="block rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md"
     >
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900">
-        {value === null ? '–' : formatNumber(value)}
-      </p>
+      <div className="flex items-center gap-3">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+        >
+          <Icon className="h-5 w-5" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500">{label}</p>
+          <p className="mt-0.5 text-2xl font-bold text-gray-900">
+            {value === null ? '–' : formatNumber(value)}
+          </p>
+        </div>
+      </div>
     </Link>
   );
 }
