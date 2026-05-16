@@ -7,23 +7,27 @@ import { api } from '@/lib/api';
 import { ActivityForm } from '@/components/faculty/ActivityForm';
 import type { FacultyActivityDetail } from '@/lib/types';
 
-// หน้าสร้างกิจกรรม สำหรับ faculty_staff (เจ้าหน้าที่คณะ)
-//   - admin / super_admin มีหน้าแยก: /dashboard/admin/activities/new
-//   - กิจกรรมจะผูกกับ req.user.faculty_id อัตโนมัติ
-//   - หลังสร้างเสร็จ → ไปหน้ารายละเอียดฝั่ง faculty
+// หน้าสร้างกิจกรรม สำหรับ admin / super_admin (cross-faculty)
+//   - แยกออกจาก /dashboard/faculty/activities/new (ของ faculty_staff)
+//   - admin ต้องเลือก "คณะ/หน่วยงาน" ของกิจกรรมเอง (ActivityForm จะ render faculty picker
+//     อัตโนมัติเมื่อ role = admin/super_admin)
+//   - หลังสร้างเสร็จ → กลับไปหน้ารายละเอียดฝั่ง admin
+//   - ใช้ endpoint POST /api/faculty/activities (เดียวกับ faculty — backend รับ body.faculty_id
+//     สำหรับ admin role)
 
 interface AcademicYearsResponse {
   current: number;
   available: number[];
 }
 
-export default function NewActivityPage() {
+export default function AdminNewActivityPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
-  // current academic year มาจาก backend (เคารพ system_settings.academic_year.start_*)
-  // ใช้เป็น default ของ field academic_year ในฟอร์มสร้างใหม่
-  const [defaultAcademicYear, setDefaultAcademicYear] = useState<number | null>(null);
+  const [defaultAcademicYear, setDefaultAcademicYear] = useState<number | null>(
+    null,
+  );
+
   useEffect(() => {
     let cancelled = false;
     api
@@ -47,7 +51,7 @@ export default function NewActivityPage() {
         '/api/faculty/activities',
         payload,
       );
-      router.replace(`/dashboard/faculty/activities/${res.data.id}`);
+      router.replace(`/dashboard/admin/activities/${res.data.id}`);
     } finally {
       setSaving(false);
     }
@@ -56,20 +60,21 @@ export default function NewActivityPage() {
   return (
     <div className="mx-auto max-w-full p-6 md:p-8">
       <Link
-        href="/dashboard/faculty/activities"
-        className="mb-4 inline-block text-sm text-blue-600 hover:underline"
+        href="/dashboard/admin/activities"
+        className="mb-4 inline-block text-sm text-indigo-600 hover:underline"
       >
         ← กลับรายการกิจกรรม
       </Link>
 
       <h1 className="mb-1 text-2xl font-bold text-gray-900">
-        สร้างกิจกรรมใหม่
+        สร้างกิจกรรมใหม่ (admin)
       </h1>
       <p className="mb-6 text-sm text-gray-500">
-        บันทึกแล้วจะเป็นฉบับร่าง (DRAFT) — แก้ไขได้ก่อนกดส่งให้ admin อนุมัติ
+        ต้องเลือกคณะ/หน่วยงานของกิจกรรม — บันทึกแล้วจะเป็นฉบับร่าง (DRAFT)
+        แก้ไขได้ก่อนเปลี่ยนสถานะ
       </p>
 
-      {/* รอ default ปีจาก backend ก่อนค่อย mount form — กัน flicker / re-init state */}
+      {/* รอ default ปีจาก backend ก่อนค่อย mount form */}
       {defaultAcademicYear === null ? (
         <div className="h-96 animate-pulse rounded-2xl border border-gray-200 bg-white" />
       ) : (

@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import defaultTheme from 'tailwindcss/defaultTheme';
 
 const config: Config = {
   content: [
@@ -7,7 +8,13 @@ const config: Config = {
     './lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        // ใช้ Sarabun เป็น default sans-serif (ผ่าน CSS variable จาก next/font)
+        // fallback → tailwind default sans (system-ui, -apple-system, ...)
+        sans: ['var(--font-sarabun)', ...defaultTheme.fontFamily.sans],
+      },
+    },
   },
   plugins: [],
 };

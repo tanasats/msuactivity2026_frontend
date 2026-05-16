@@ -231,7 +231,7 @@ export function ActivityForm({
             '/api/categories?is_active=true',
           ),
           api.get<{ items: RefData['faculties'] }>(
-            '/api/faculties?is_active=true&category=A',
+            '/api/faculties?is_active=true',
           ),
         ]);
         if (cancelled) return;

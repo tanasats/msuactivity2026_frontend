@@ -1,3 +1,12 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* globals.css */
+html {
+  font-size: 18px; /* Changes the base for all rem units */
+}
+
+body {
+  font-size: 1rem; /* Ensures the body uses the new base */
+}

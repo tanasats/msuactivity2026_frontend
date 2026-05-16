@@ -420,7 +420,7 @@ function ByYearChart({
                     title={`ดำเนินการ ${y.work_count}`}
                   />
                   <div
-                    className="absolute inset-y-0 bg-slate-400"
+                    className="absolute inset-y-0 bg-blue-500"
                     style={{ left: `${workPct}%`, width: `${completedPct}%` }}
                     title={`เสร็จสิ้น ${y.completed_count}`}
                   />
@@ -439,7 +439,7 @@ function ByYearChart({
           ดำเนินการ
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-3 rounded-sm bg-slate-400" />
+          <span className="inline-block h-2.5 w-3 rounded-sm bg-blue-500" />
           เสร็จสิ้น
         </span>
       </div>

@@ -53,8 +53,10 @@ interface Summary {
   pending: number;
   registered: number;
   attended: number;
+  pending_eval: number;   // เช็คอินแล้ว แต่ยังไม่ได้รับการประเมินผล
   passed: number;
   failed: number;
+  cancelled: number;      // CANCELLED_BY_USER + CANCELLED_BY_STAFF + REJECTED_BY_STAFF
   total: number;
 }
 
@@ -105,19 +107,39 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
         }),
       );
       const [pending, registered, attended, noshow] = counts;
-      // count passed/failed via evaluation_status
-      const passedRes = await api.get<{ total: number }>(
-        `/api/admin/registrations?activity_id=${activityId}&evaluation_status=PASSED&limit=1`,
-      );
-      const failedRes = await api.get<{ total: number }>(
-        `/api/admin/registrations?activity_id=${activityId}&evaluation_status=FAILED&limit=1`,
-      );
+      // count passed/failed/pending_eval via evaluation_status (parallel)
+      // cancelled = รวม 3 status ของการยกเลิก (USER + STAFF + REJECTED)
+      const cancelStatuses = [
+        'CANCELLED_BY_USER',
+        'CANCELLED_BY_STAFF',
+        'REJECTED_BY_STAFF',
+      ] as const;
+      const [passedRes, failedRes, pendingEvalRes, ...cancelledArr] =
+        await Promise.all([
+          api.get<{ total: number }>(
+            `/api/admin/registrations?activity_id=${activityId}&evaluation_status=PASSED&limit=1`,
+          ),
+          api.get<{ total: number }>(
+            `/api/admin/registrations?activity_id=${activityId}&evaluation_status=FAILED&limit=1`,
+          ),
+          api.get<{ total: number }>(
+            `/api/admin/registrations?activity_id=${activityId}&evaluation_status=PENDING_EVALUATION&limit=1`,
+          ),
+          ...cancelStatuses.map((s) =>
+            api.get<{ total: number }>(
+              `/api/admin/registrations?activity_id=${activityId}&status=${s}&limit=1`,
+            ),
+          ),
+        ]);
+      const cancelled = cancelledArr.reduce((sum, r) => sum + r.data.total, 0);
       setSummary({
         pending,
         registered,
         attended: attended + noshow, // attended-ish (รวม no-show)
+        pending_eval: pendingEvalRes.data.total,
         passed: passedRes.data.total,
         failed: failedRes.data.total,
+        cancelled,
         total: totalRes.data.total,
       });
     } catch {
@@ -148,11 +170,17 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
 
       {/* Summary stats */}
       {summary && (
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <StatTile label="รออนุมัติ" value={summary.pending} tone="amber" />
           <StatTile label="ลงทะเบียน" value={summary.registered} tone="blue" />
+          <StatTile
+            label="รอประเมิน"
+            value={summary.pending_eval}
+            tone="violet"
+          />
           <StatTile label="ผ่าน" value={summary.passed} tone="emerald" />
           <StatTile label="ไม่ผ่าน" value={summary.failed} tone="rose" />
+          <StatTile label="ยกเลิก" value={summary.cancelled} tone="gray" />
         </div>
       )}
 
@@ -399,13 +427,15 @@ function StatTile({
 }: {
   label: string;
   value: number;
-  tone: 'amber' | 'blue' | 'emerald' | 'rose';
+  tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'violet' | 'gray';
 }) {
   const toneClass = {
     amber: 'bg-amber-50 text-amber-800',
     blue: 'bg-blue-50 text-blue-800',
     emerald: 'bg-emerald-50 text-emerald-800',
     rose: 'bg-rose-50 text-rose-800',
+    violet: 'bg-violet-50 text-violet-800',
+    gray: 'bg-gray-100 text-gray-700',
   }[tone];
   return (
     <div className={`rounded-lg px-3 py-2 ${toneClass}`}>
