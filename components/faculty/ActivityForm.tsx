@@ -789,7 +789,7 @@ export function ActivityForm({
               options={yearSkills.map((s) => ({
                 id: s.id,
                 label: s.parent_code
-                  ? `${s.parent_code}· ${s.name}` 
+                  ? `${s.code}: ${s.name}` 
                   : `${s.code} ${s.name}`,
               }))}
               selected={value.skill_ids}
