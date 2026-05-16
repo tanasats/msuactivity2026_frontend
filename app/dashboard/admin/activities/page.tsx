@@ -64,11 +64,17 @@ function AdminActivitiesPageInner() {
   const facultyIdRaw = params.get('faculty_id');
   const facultyId =
     facultyIdRaw && /^\d+$/.test(facultyIdRaw) ? Number(facultyIdRaw) : null;
+  // academicYear:
+  //   null   = ยังไม่ initialize (URL ไม่มี param) → effect ด้านล่างจะ fill default
+  //   'all'  = ผู้ใช้เลือก "ทุกปีการศึกษา" → ไม่ filter (ไม่ส่ง param ไป backend)
+  //   number = ปี พ.ศ. เฉพาะ
   const academicYearRaw = params.get('academic_year');
-  const academicYear =
-    academicYearRaw && /^\d+$/.test(academicYearRaw)
-      ? Number(academicYearRaw)
-      : null;
+  const academicYear: number | 'all' | null =
+    academicYearRaw === 'all'
+      ? 'all'
+      : academicYearRaw && /^\d+$/.test(academicYearRaw)
+        ? Number(academicYearRaw)
+        : null;
   const searchUrl = params.get('search') ?? '';
   const sortRaw = params.get('sort') as SortKey | null;
   const sortKey: SortKey =
@@ -149,6 +155,9 @@ function AdminActivitiesPageInner() {
   }, [academicYear, defaultAcademicYear, params, router]);
 
   // โหลดรายการตาม filter ทุกครั้งที่ URL เปลี่ยน — stale-while-revalidate
+  //   academicYear === null  → ยังไม่พร้อม (รอ default fill)
+  //   academicYear === 'all' → ไม่ส่ง academic_year param (backend = no filter)
+  //   academicYear: number   → ส่งปีนั้น
   async function loadItems(showLoading = true) {
     if (academicYear === null) return;
     if (showLoading) setLoading(true);
@@ -156,7 +165,7 @@ function AdminActivitiesPageInner() {
       const qs = new URLSearchParams();
       if (status) qs.set('status', status);
       if (facultyId !== null) qs.set('faculty_id', String(facultyId));
-      qs.set('academic_year', String(academicYear));
+      if (academicYear !== 'all') qs.set('academic_year', String(academicYear));
       if (searchUrl) qs.set('search', searchUrl);
       qs.set('sort', sortKey);
       qs.set('limit', String(pageSize));
@@ -185,7 +194,8 @@ function AdminActivitiesPageInner() {
         const qs = new URLSearchParams();
         if (status) qs.set('status', status);
         if (facultyId !== null) qs.set('faculty_id', String(facultyId));
-        qs.set('academic_year', String(academicYear));
+        if (academicYear !== 'all')
+          qs.set('academic_year', String(academicYear));
         if (searchUrl) qs.set('search', searchUrl);
         qs.set('sort', sortKey);
         qs.set('limit', String(pageSize));
@@ -470,7 +480,7 @@ function AdminActivitiesPageInner() {
             ))}
           </select>
 
-          {/* academic year */}
+          {/* academic year — รองรับ 'all' = ทุกปี (ไม่ filter) */}
           <select
             value={academicYear ?? ''}
             onChange={(e) => patch({ academic_year: e.target.value })}
@@ -478,6 +488,7 @@ function AdminActivitiesPageInner() {
             className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
             aria-label="ปีการศึกษา"
           >
+            <option value="all">ทุกปีการศึกษา</option>
             {availableYears.map((y) => (
               <option key={y} value={y}>
                 ปี {y}
@@ -512,6 +523,19 @@ function AdminActivitiesPageInner() {
                 <FilterChip
                   label={`"${searchUrl}"`}
                   onClear={() => onSearchChange('')}
+                />
+              )}
+              {academicYear === 'all' && (
+                <FilterChip
+                  label="ทุกปีการศึกษา"
+                  onClear={() =>
+                    patch({
+                      academic_year:
+                        defaultAcademicYear !== null
+                          ? String(defaultAcademicYear)
+                          : null,
+                    })
+                  }
                 />
               )}
               <button

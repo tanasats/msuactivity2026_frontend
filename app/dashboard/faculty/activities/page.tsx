@@ -344,8 +344,7 @@ function FacultyActivitiesPageInner() {
                     <td className="px-4 py-3 align-top">
                       <Link
                         href={`/dashboard/faculty/activities/${a.id}`}
-                        className="font-medium text-gray-900 hover:text-blue-700"
-                      >
+                        className="font-medium text-gray-900 hover:text-blue-700">
                         {a.title}
                       </Link>
                       <p className="text-xs text-gray-500">
