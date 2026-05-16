@@ -335,6 +335,35 @@ export interface MasterDataAuditEntry {
   actor_role: UserRole;
 }
 
+// registration_audit_logs — per-registration mutation timeline
+export type RegistrationAuditAction =
+  | 'register'
+  | 'staff_add'
+  | 'approve'
+  | 'reject'
+  | 'cancel_by_user'
+  | 'cancel_by_staff'
+  | 'check_in'
+  | 'staff_check_in'
+  | 'no_show'
+  | 'evaluate'
+  | 'change_role';
+
+export interface RegistrationAuditEntry {
+  id: number;
+  action: RegistrationAuditAction;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  note: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  actor_id: number;
+  actor_name: string;
+  actor_email: string;
+  actor_role: UserRole;
+}
+
 export type UserAuditAction = 'role_change' | 'faculty_change' | 'status_change';
 
 export interface UserAuditLog {

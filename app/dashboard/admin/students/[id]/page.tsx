@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Download,
   Gem,
+  History,
   Mail,
   TrendingUp,
   Trophy,
@@ -19,6 +20,7 @@ import { downloadAuthed } from '@/lib/download';
 import { formatNumber } from '@/lib/format';
 import { PARTICIPANT_ROLE_LABEL } from '@/lib/participant-role';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
+import { RegistrationAuditDialog } from '@/components/admin/RegistrationAuditDialog';
 import type {
   AdminStudentDetail,
   AdminStudentRegistration,
@@ -52,6 +54,8 @@ export default function AdminStudentDetailPage() {
   const [yearFilter, setYearFilter] = useState<number | 'all'>('all');
   const [evalFilter, setEvalFilter] = useState<EvaluationStatus | 'all'>('all');
   const [pendingCancel, setPendingCancel] = useState<AdminStudentRegistration | null>(null);
+  // auditing = registration ที่กำลังเปิดดูประวัติอยู่
+  const [auditing, setAuditing] = useState<AdminStudentRegistration | null>(null);
 
   async function reload() {
     if (!id) return;
@@ -366,6 +370,7 @@ export default function AdminStudentDetailPage() {
                     key={r.registration_id}
                     r={r}
                     onAskCancel={() => setPendingCancel(r)}
+                    onViewAudit={() => setAuditing(r)}
                   />
                 ))}
               </tbody>
@@ -386,6 +391,21 @@ export default function AdminStudentDetailPage() {
           }}
         />
       )}
+
+      <RegistrationAuditDialog
+        open={!!auditing}
+        registrationId={auditing?.registration_id ?? null}
+        context={
+          auditing
+            ? {
+                student_name: data.user.full_name,
+                msu_id: data.user.msu_id,
+                activity_title: auditing.activity_title,
+              }
+            : undefined
+        }
+        onClose={() => setAuditing(null)}
+      />
     </div>
   );
 }
@@ -411,9 +431,11 @@ const ADMIN_CANCELABLE_REG = new Set([
 function RegistrationRow({
   r,
   onAskCancel,
+  onViewAudit,
 }: {
   r: AdminStudentRegistration;
   onAskCancel: () => void;
+  onViewAudit: () => void;
 }) {
   const regLabel = REG_STATUS_LABEL[r.registration_status];
   const evalLabel = r.evaluation_status ? EVAL_LABEL[r.evaluation_status] : null;
@@ -482,17 +504,28 @@ function RegistrationRow({
         )}
       </td>
       <td className="px-3 py-2 text-right">
-        {canCancel && (
+        <div className="flex justify-end gap-1.5">
           <button
             type="button"
-            onClick={onAskCancel}
-            className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
-            title="ยกเลิกการลงทะเบียน"
+            onClick={onViewAudit}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            title="ดูประวัติของ registration นี้"
           >
-            <Ban className="h-3 w-3" aria-hidden />
-            ยกเลิก
+            <History className="h-3 w-3" aria-hidden />
+            ประวัติ
           </button>
-        )}
+          {canCancel && (
+            <button
+              type="button"
+              onClick={onAskCancel}
+              className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+              title="ยกเลิกการลงทะเบียน"
+            >
+              <Ban className="h-3 w-3" aria-hidden />
+              ยกเลิก
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );

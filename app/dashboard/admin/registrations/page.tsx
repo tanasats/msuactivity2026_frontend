@@ -9,6 +9,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Download,
+  History,
   ListChecks,
   Loader2,
   Search,
@@ -19,6 +20,7 @@ import { downloadAuthed } from '@/lib/download';
 import { formatNumber } from '@/lib/format';
 import { PARTICIPANT_ROLE_LABEL } from '@/lib/participant-role';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
+import { RegistrationAuditDialog } from '@/components/admin/RegistrationAuditDialog';
 import type {
   AdminRegistrationRow,
   EvaluationStatus,
@@ -65,6 +67,8 @@ export default function AdminRegistrationsPage() {
   const [evalStatus, setEvalStatus] = useState<EvaluationStatus | 'all'>('all');
   const [academicYear, setAcademicYear] = useState<number | 'all'>('all');
   const [pendingCancel, setPendingCancel] = useState<AdminRegistrationRow | null>(null);
+  // auditing = registration ที่กำลังเปิดดูประวัติอยู่
+  const [auditing, setAuditing] = useState<AdminRegistrationRow | null>(null);
 
   const ADMIN_CANCELABLE_STATUSES = new Set<RegistrationStatus>([
     'PENDING_APPROVAL',
@@ -442,17 +446,28 @@ export default function AdminRegistrationsPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {ADMIN_CANCELABLE_STATUSES.has(r.registration_status) && (
+                        <div className="flex justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setPendingCancel(r)}
-                            className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
-                            title="ยกเลิกการลงทะเบียน"
+                            onClick={() => setAuditing(r)}
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            title="ดูประวัติของ registration นี้"
                           >
-                            <Ban className="h-3 w-3" aria-hidden />
-                            ยกเลิก
+                            <History className="h-3 w-3" aria-hidden />
+                            ประวัติ
                           </button>
-                        )}
+                          {ADMIN_CANCELABLE_STATUSES.has(r.registration_status) && (
+                            <button
+                              type="button"
+                              onClick={() => setPendingCancel(r)}
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                              title="ยกเลิกการลงทะเบียน"
+                            >
+                              <Ban className="h-3 w-3" aria-hidden />
+                              ยกเลิก
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -483,6 +498,21 @@ export default function AdminRegistrationsPage() {
           }}
         />
       )}
+
+      <RegistrationAuditDialog
+        open={!!auditing}
+        registrationId={auditing?.registration_id ?? null}
+        context={
+          auditing
+            ? {
+                student_name: auditing.student_name,
+                msu_id: auditing.msu_id,
+                activity_title: auditing.activity_title,
+              }
+            : undefined
+        }
+        onClose={() => setAuditing(null)}
+      />
     </div>
   );
 }
