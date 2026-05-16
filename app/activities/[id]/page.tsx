@@ -272,22 +272,43 @@ export default function ActivityDetailPage() {
               capacity={activity.capacity}
             />
 
-            <div className="sticky bottom-4 rounded-2xl bg-white/95 p-4 shadow-md ring-1 ring-gray-200 backdrop-blur md:static md:shadow-none md:ring-0">
-              <button
-                onClick={handleApplyClick}
-                disabled={
-                  submitting ||
-                  activity.registered_count >= activity.capacity
-                }
-                className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-              >
-                {activity.registered_count >= activity.capacity
-                  ? 'ที่นั่งเต็มแล้ว'
-                  : isLoggedIn
-                    ? 'สมัครเข้าร่วมกิจกรรม'
-                    : 'เข้าสู่ระบบเพื่อสมัคร'}
-              </button>
-            </div>
+            {(() => {
+              // ตรวจช่วงรับสมัคร — ปุ่มจะ disable + เปลี่ยน label ตามเหตุผล
+              //   not_open = ยังไม่ถึงเวลาเปิดรับสมัคร
+              //   closed   = ปิดรับสมัครแล้ว
+              //   full     = ที่นั่งเต็ม
+              //   open     = ยังรับได้ → กดสมัครได้
+              const now = Date.now();
+              const opensAt = activity.registration_open_at
+                ? new Date(activity.registration_open_at).getTime()
+                : null;
+              const closesAt = activity.registration_close_at
+                ? new Date(activity.registration_close_at).getTime()
+                : null;
+              const isFull = activity.registered_count >= activity.capacity;
+              const notOpenYet = opensAt !== null && now < opensAt;
+              const alreadyClosed = closesAt !== null && now > closesAt;
+
+              const blocked = isFull || notOpenYet || alreadyClosed;
+              let label: string;
+              if (notOpenYet) label = 'ยังไม่เปิดรับสมัคร';
+              else if (alreadyClosed) label = 'ปิดรับสมัครแล้ว';
+              else if (isFull) label = 'ที่นั่งเต็มแล้ว';
+              else if (!isLoggedIn) label = 'เข้าสู่ระบบเพื่อสมัคร';
+              else label = 'สมัครเข้าร่วมกิจกรรม';
+
+              return (
+                <div className="sticky bottom-4 rounded-2xl bg-white/95 p-4 shadow-md ring-1 ring-gray-200 backdrop-blur md:static md:shadow-none md:ring-0">
+                  <button
+                    onClick={handleApplyClick}
+                    disabled={submitting || blocked}
+                    className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  >
+                    {label}
+                  </button>
+                </div>
+              );
+            })()}
 
           </article>
         )}
