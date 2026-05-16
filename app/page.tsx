@@ -53,14 +53,6 @@ async function loadLandingData(): Promise<LandingData> {
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_SEARCH_LEN = 2;
 
-const CATEGORY_COLORS = [
-  'bg-blue-500',
-  'bg-emerald-500',
-  'bg-amber-500',
-  'bg-violet-500',
-  'bg-rose-500',
-];
-
 export default function LandingPage() {
   const [data, setData] = useState<LandingData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -250,11 +242,12 @@ export default function LandingPage() {
         )}
       </section>
 
-      {/* Charts — by year + by category */}
+      {/* Charts — by year / by category / by skill (3 horizontal bars, blue tone) */}
       {data && (
-        <section className="mx-auto grid max-w-6xl gap-5 px-6 py-6 lg:grid-cols-2">
+        <section className="mx-auto grid max-w-6xl gap-5 px-6 py-6 lg:grid-cols-3">
           <ByYearChart data={data.stats.by_year} />
           <ByCategoryChart data={data.stats.by_category} />
+          <BySkillChart data={data.stats.by_skill} />
         </section>
       )}
 
@@ -378,28 +371,57 @@ function StatCard({
 }
 
 // ─── Charts (CSS-based, no chart library) ─────────────────────
+//
+// Design language (ทุก chart):
+//   - palette: rainbow 5 สี — rose / amber / emerald / sky / violet
+//       proportion chart (category, skill) ใช้สีตาม index หลัง sort desc
+//       stacked chart (year) ใช้ 2 สี: sky (ดำเนินการ) + emerald (เสร็จสิ้น) สื่อ active vs done
+//   - track: bg-gray-100 (neutral — ให้สีรุ้งเด่น)
+//   - shape: horizontal bar (อ่านง่าย, scan เร็ว, รองรับ label ไทยยาว)
+//   - card shell: rounded-2xl + border-gray-200 + p-5 + shadow-sm
 
-function ByYearChart({
-  data,
+const CHART_CARD =
+  'rounded-2xl border border-gray-200 bg-white p-5 shadow-sm';
+
+const RAINBOW_PALETTE = [
+  'bg-rose-400',
+  'bg-amber-400',
+  'bg-emerald-400',
+  'bg-sky-400',
+  'bg-violet-400',
+];
+
+function ChartHeader({
+  title,
+  subtitle,
 }: {
-  data: LandingStats['by_year'];
+  title: string;
+  subtitle?: string;
 }) {
-  // scale: ใช้ตัวเลขมากสุดของ (work + completed) ต่อปี เป็น 100%
+  return (
+    <div className="mb-4">
+      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+      {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+    </div>
+  );
+}
+
+// ── ByYearChart — stacked horizontal bar (work + completed) ───────
+//   stacked ดีเพราะแสดงทั้ง total และ breakdown ในแถวเดียว
+//   ใช้ sky-500 (work = active สีฟ้า) + emerald-500 (completed = done สีเขียว)
+//   เลือก 2 สีจาก rainbow palette ที่สื่อความหมายชัด
+function ByYearChart({ data }: { data: LandingStats['by_year'] }) {
   const max = Math.max(
     1,
     ...data.map((y) => y.work_count + y.completed_count),
   );
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-4">
-        <h3 className="text-base font-semibold text-gray-900">
-          กิจกรรมแยกตามปีการศึกษา
-        </h3>
-        <p className="text-xs text-gray-500">
-          นับเฉพาะที่ดำเนินการ + เสร็จสิ้น
-        </p>
-      </div>
+    <div className={CHART_CARD}>
+      <ChartHeader
+        title="กิจกรรมแยกตามปีการศึกษา"
+        subtitle="นับเฉพาะที่ดำเนินการ + เสร็จสิ้น"
+      />
       {data.length === 0 ? (
         <EmptyState message="ยังไม่มีข้อมูลกิจกรรม" />
       ) : (
@@ -415,17 +437,17 @@ function ByYearChart({
                 </span>
                 <div className="relative h-7 flex-1 overflow-hidden rounded-md bg-gray-100">
                   <div
-                    className="absolute inset-y-0 left-0 bg-emerald-500"
+                    className="absolute inset-y-0 left-0 bg-sky-500"
                     style={{ width: `${workPct}%` }}
                     title={`ดำเนินการ ${y.work_count}`}
                   />
                   <div
-                    className="absolute inset-y-0 bg-blue-500"
+                    className="absolute inset-y-0 bg-emerald-500"
                     style={{ left: `${workPct}%`, width: `${completedPct}%` }}
                     title={`เสร็จสิ้น ${y.completed_count}`}
                   />
                 </div>
-                <span className="w-16 shrink-0 text-right text-sm font-semibold tabular-nums text-gray-900">
+                <span className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-gray-900">
                   {formatNumber(total)}
                 </span>
               </div>
@@ -435,11 +457,11 @@ function ByYearChart({
       )}
       <div className="mt-4 flex items-center gap-4 border-t border-gray-100 pt-3 text-xs text-gray-600">
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-3 rounded-sm bg-emerald-500" />
+          <span className="inline-block h-2.5 w-3 rounded-sm bg-sky-500" />
           ดำเนินการ
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-3 rounded-sm bg-blue-500" />
+          <span className="inline-block h-2.5 w-3 rounded-sm bg-emerald-500" />
           เสร็จสิ้น
         </span>
       </div>
@@ -447,56 +469,107 @@ function ByYearChart({
   );
 }
 
-function ByCategoryChart({
-  data,
+// ── ProportionBar — horizontal bar แบบ proportion (เปอร์เซ็นต์)
+//   ใช้ร่วมกันระหว่าง ByCategoryChart และ BySkillChart
+//   colorClass มาจาก caller (กำหนดสีจาก RAINBOW_PALETTE ตาม index)
+function ProportionBar({
+  label,
+  count,
+  total,
+  max,
+  colorClass,
 }: {
-  data: LandingStats['by_category'];
+  label: string;
+  count: number;
+  total: number;
+  max: number;
+  colorClass: string;
 }) {
+  const pct = total > 0 ? (count / total) * 100 : 0;
+  const barPct = (count / max) * 100;
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="truncate font-medium text-gray-700">{label}</span>
+        <span className="ml-2 shrink-0 tabular-nums text-gray-600">
+          {formatNumber(count)}
+          <span className="ml-1 text-gray-400">({pct.toFixed(1)}%)</span>
+        </span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-gray-100">
+        <div
+          className={`h-full rounded-full ${colorClass}`}
+          style={{ width: `${barPct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── ByCategoryChart — proportion ของ 4 ประเภท ──────────────────
+//   เรียง desc — สีจาก rainbow palette ตาม rank (อันดับ 1 = rose, ลงไปเรื่อย ๆ)
+function ByCategoryChart({ data }: { data: LandingStats['by_category'] }) {
   const total = data.reduce((s, c) => s + c.count, 0);
   const max = Math.max(1, ...data.map((c) => c.count));
+  const sorted = [...data].sort((a, b) => b.count - a.count);
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-4">
-        <h3 className="text-base font-semibold text-gray-900">
-          สัดส่วนตามประเภทกิจกรรม
-        </h3>
-        {total > 0 && (
-          <p className="text-xs text-gray-500">
-            รวม {formatNumber(total)} กิจกรรม (4 ประเภท)
-          </p>
-        )}
-      </div>
+    <div className={CHART_CARD}>
+      <ChartHeader
+        title="สัดส่วนตามประเภทกิจกรรม"
+        subtitle={total > 0 ? `รวม ${formatNumber(total)} กิจกรรม` : undefined}
+      />
       {data.length === 0 ? (
         <EmptyState message="ยังไม่มีข้อมูลกิจกรรม" />
       ) : (
         <div className="space-y-3">
-          {data.map((c, i) => {
-            const pct = total > 0 ? (c.count / total) * 100 : 0;
-            const barPct = (c.count / max) * 100;
-            const color = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
-            return (
-              <div key={c.category_id}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="truncate font-medium text-gray-700">
-                    {c.category_name}
-                  </span>
-                  <span className="ml-2 shrink-0 tabular-nums text-gray-600">
-                    {formatNumber(c.count)}
-                    <span className="ml-1 text-gray-400">
-                      ({pct.toFixed(1)}%)
-                    </span>
-                  </span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className={`h-full rounded-full ${color}`}
-                    style={{ width: `${barPct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {sorted.map((c, i) => (
+            <ProportionBar
+              key={c.category_id}
+              label={c.category_name}
+              count={c.count}
+              total={total}
+              max={max}
+              colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── BySkillChart — proportion ของทักษะที่จะได้รับ (rollup parent) ─
+//   1 กิจกรรมอาจมีหลายทักษะ → sum ของ count > activities_count ได้
+function BySkillChart({ data }: { data: LandingStats['by_skill'] }) {
+  const total = data.reduce((s, c) => s + c.count, 0);
+  const max = Math.max(1, ...data.map((c) => c.count));
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+
+  return (
+    <div className={CHART_CARD}>
+      <ChartHeader
+        title="สัดส่วนทักษะที่จะได้รับ"
+        subtitle={
+          total > 0
+            ? `รวม ${formatNumber(total)} ทักษะ (1 กิจกรรมอาจมีหลายทักษะ)`
+            : undefined
+        }
+      />
+      {data.length === 0 ? (
+        <EmptyState message="ยังไม่มีข้อมูลทักษะ" />
+      ) : (
+        <div className="space-y-3">
+          {sorted.map((s, i) => (
+            <ProportionBar
+              key={s.skill_id}
+              label={`${s.skill_code} · ${s.skill_name}`}
+              count={s.count}
+              total={total}
+              max={max}
+              colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
+            />
+          ))}
         </div>
       )}
     </div>

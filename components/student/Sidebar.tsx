@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard,
+  Heart,
   Home,
+  LayoutDashboard,
   LogOut,
   X,
   type LucideIcon,
@@ -26,13 +27,18 @@ const NAV_ITEMS: NavItem[] = [
     label: 'หน้าหลัก', 
     Icon: Home 
   },
+  // Dashboard ใช้ exact match — กัน highlight ซ้อนกับ /interests sub-route
   {
     href: '/dashboard/student',
     label: 'Dashboard',
     Icon: LayoutDashboard,
-    matchPrefix: '/dashboard/student',
   },
-
+  {
+    href: '/dashboard/student/interests',
+    label: 'กิจกรรมที่ฉันสนใจ',
+    Icon: Heart,
+    matchPrefix: '/dashboard/student/interests',
+  },
 ];
 
 interface Props {

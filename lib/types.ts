@@ -371,11 +371,19 @@ export interface LandingStatsByCategory {
   category_name: string;
   count: number;
 }
+// by_skill — rollup ระดับ parent (รวม child ทุกปีเข้ามา)
+export interface LandingStatsBySkill {
+  skill_id: number;
+  skill_code: string;
+  skill_name: string;
+  count: number;
+}
 export interface LandingStats {
   activities_count: number;            // WORK + COMPLETED รวมทุกปี
   members_count: number;               // active users
   by_year: LandingStatsByYear[];       // เรียง academic_year ASC
   by_category: LandingStatsByCategory[]; // เรียง category_code ASC
+  by_skill: LandingStatsBySkill[];     // เรียง skill_code ASC (rollup parent)
 }
 
 export type ActivityStatus =
@@ -404,7 +412,38 @@ export interface ActivitySummary {
   category_name: string;
   organization_code: string;
   organization_name: string;
+  // ผู้สนใจกิจกรรม (Phase: interest tracking)
+  //   view_count       — page view (denormalized counter; dedup ฝั่ง client)
+  //   interested_count — จำนวนนิสิตที่กด "❤️ สนใจ"
+  view_count?: number;
+  interested_count?: number;
   poster_url?: string | null;
+}
+
+// student interest item — สำหรับ student dashboard "กิจกรรมที่ฉันสนใจ"
+export interface StudentInterestActivity {
+  activity_id: number;
+  interested_at: string;
+  code: string | null;
+  title: string;
+  location: string;
+  start_at: string;
+  end_at: string;
+  registration_open_at: string;
+  registration_close_at: string;
+  hours: number;
+  loan_hours: number;
+  capacity: number;
+  registered_count: number;
+  status: ActivityStatus;
+  academic_year: number;
+  semester: number;
+  interested_count: number;
+  view_count: number;
+  category_code: number;
+  category_name: string;
+  organization_code: string;
+  organization_name: string;
 }
 
 export interface ActivityPoster {

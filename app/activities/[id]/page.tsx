@@ -8,6 +8,8 @@ import {
   Calendar,
   CalendarClock,
   Clock,
+  Eye,
+  Heart,
   MapPin,
   type LucideIcon,
 } from 'lucide-react';
@@ -41,6 +43,9 @@ export default function ActivityDetailPage() {
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // interest state — initial = null (ยังไม่รู้); load จาก /api/student/interests/ids ตอน auth
+  const [isInterested, setIsInterested] = useState<boolean | null>(null);
+  const [interestBusy, setInterestBusy] = useState(false);
 
   useEffect(() => {
     const id = params?.id;
@@ -55,6 +60,66 @@ export default function ActivityDetailPage() {
         setError({ status, message });
       });
   }, [params?.id]);
+
+  // ping view count — dedup ฝั่ง client ด้วย localStorage (1 view ต่อ session ต่อกิจกรรม)
+  //   key รวม activity id เพื่อให้ track แยกแต่ละกิจกรรม
+  //   sessionStorage > localStorage เพราะเรานับ "ต่อ session" ไม่ใช่ "ตลอดไป"
+  useEffect(() => {
+    const id = params?.id;
+    if (!id) return;
+    const key = `view:${id}`;
+    if (typeof window === 'undefined') return;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    publicApi.post(`/api/public/activities/${id}/view`).catch(() => {
+      // non-fatal — view tracking ล้มเหลวไม่กระทบ UX
+    });
+  }, [params?.id]);
+
+  // load is_interested_by_me — เฉพาะ student ที่ login (interest endpoint scope ที่ student เท่านั้น)
+  useEffect(() => {
+    const id = params?.id;
+    if (!id || !isLoggedIn || user?.role !== 'student') return;
+    api
+      .get<{ ids: number[] }>(`/api/student/interests/ids`)
+      .then((res) => setIsInterested(res.data.ids.includes(Number(id))))
+      .catch(() => setIsInterested(false));
+  }, [params?.id, isLoggedIn, user?.role]);
+
+  async function toggleInterest() {
+    if (!activity) return;
+    if (!isLoggedIn) {
+      router.push('/login');
+      return;
+    }
+    if (user?.role !== 'student') {
+      toast.error('เฉพาะนิสิตเท่านั้นที่กดสนใจกิจกรรมได้');
+      return;
+    }
+    setInterestBusy(true);
+    try {
+      if (isInterested) {
+        await api.delete(`/api/student/interests/${activity.id}`);
+        setIsInterested(false);
+        setActivity({
+          ...activity,
+          interested_count: Math.max((activity.interested_count ?? 1) - 1, 0),
+        });
+      } else {
+        await api.post(`/api/student/interests/${activity.id}`);
+        setIsInterested(true);
+        setActivity({
+          ...activity,
+          interested_count: (activity.interested_count ?? 0) + 1,
+        });
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'ดำเนินการไม่สำเร็จ');
+    } finally {
+      setInterestBusy(false);
+    }
+  }
 
   function handleApplyClick() {
     if (!isLoggedIn) {
@@ -271,6 +336,42 @@ export default function ActivityDetailPage() {
               registered={activity.registered_count}
               capacity={activity.capacity}
             />
+
+            {/* Interest stats + button — รวม view + interested counter */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex gap-4 text-sm text-gray-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <Eye className="h-4 w-4 text-gray-400" aria-hidden />
+                  <span className="tabular-nums">
+                    {formatNumber(activity.view_count ?? 0)}
+                  </span>{' '}
+                  ครั้ง
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Heart className="h-4 w-4 text-rose-400" aria-hidden />
+                  <span className="tabular-nums">
+                    {formatNumber(activity.interested_count ?? 0)}
+                  </span>{' '}
+                  คนสนใจ
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleInterest}
+                disabled={interestBusy}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isInterested
+                    ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700'
+                }`}
+              >
+                <Heart
+                  className={`h-4 w-4 ${isInterested ? 'fill-current' : ''}`}
+                  aria-hidden
+                />
+                {isInterested ? 'สนใจแล้ว' : 'สนใจกิจกรรมนี้'}
+              </button>
+            </div>
 
             {(() => {
               // ตรวจช่วงรับสมัคร — ปุ่มจะ disable + เปลี่ยน label ตามเหตุผล

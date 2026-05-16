@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Calendar, ImageOff, MapPin } from 'lucide-react';
+import { Calendar, Eye, Heart, ImageOff, MapPin } from 'lucide-react';
 import type { ActivitySummary } from '@/lib/types';
 import { formatActivityRange, formatDate, formatNumber } from '@/lib/format';
 
@@ -79,6 +79,29 @@ export function ActivityCard({ activity, variant = 'open' }: Props) {
             {formatActivityRange(activity.start_at, activity.end_at)}
           </span>
         </div>
+
+        {/* Interest stats (view + interested) — แสดงเฉพาะตอนมี data */}
+        {(activity.view_count !== undefined ||
+          activity.interested_count !== undefined) && (
+          <div className="mb-2 flex gap-3 text-xs text-gray-500">
+            {activity.view_count !== undefined && (
+              <span className="inline-flex items-center gap-1">
+                <Eye className="h-3 w-3 text-gray-400" aria-hidden />
+                <span className="tabular-nums">
+                  {formatNumber(activity.view_count)}
+                </span>
+              </span>
+            )}
+            {(activity.interested_count ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 text-rose-500">
+                <Heart className="h-3 w-3 fill-rose-500" aria-hidden />
+                <span className="tabular-nums">
+                  {formatNumber(activity.interested_count ?? 0)}
+                </span>
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="mt-auto pt-3">
           {variant === 'open' ? (
