@@ -24,7 +24,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
-      <div className='w-full py-4'>
+      <div className='flex justify-center items-center w-full py-4'>
           <Image
             src="/images/20220805-HeaderMSU.webp"
             alt="มหาวิทยาลัยมหาสารคาม"
