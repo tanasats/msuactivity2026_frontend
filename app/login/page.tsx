@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 
 export default function LoginPage() {
@@ -22,10 +24,20 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
+      <div className='w-full py-4'>
+          <Image
+            src="/images/20220805-HeaderMSU.webp"
+            alt="มหาวิทยาลัยมหาสารคาม"
+            width={400}
+            height={120}
+            className="h-auto w-full max-w-xs"
+            priority
+          />
+      </div>
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-md">
-        <h1 className="mb-2 text-3xl font-bold text-gray-900">MSU Activity</h1>
+        <h1 className="mb-2 text-3xl font-bold text-gray-600">MSU Activity</h1>
         <p className="mb-8 text-sm text-gray-500">
-          ระบบจัดการกิจกรรมนิสิต มหาวิทยาลัยมหาสารคาม
+          ระบบกิจกรรมนิสิต มหาวิทยาลัยมหาสารคาม
         </p>
 
         <button
@@ -33,7 +45,7 @@ export default function LoginPage() {
           disabled={loading}
           className="flex w-full items-center justify-center gap-3 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? 'กำลังเปิดหน้า login...' : 'เข้าสู่ระบบด้วย Google MSU'}
+          {loading ? 'กำลังเปิดหน้า login...' : 'เข้าสู่ระบบด้วย email MSU'}
         </button>
 
         {error && (
@@ -43,6 +55,9 @@ export default function LoginPage() {
         <p className="mt-6 text-xs text-gray-400">
           ใช้บัญชีอีเมลของมหาวิทยาลัย <span className="font-mono">@msu.ac.th</span> เท่านั้น
         </p>
+      </div>
+      <div className="pt-5 text-slate-500">
+        <Link href={'/'}>กลับหน้าหลัก</Link>
       </div>
     </main>
   );
