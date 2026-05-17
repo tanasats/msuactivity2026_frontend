@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { ActivityForm } from '@/components/faculty/ActivityForm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { RichTextContent } from '@/components/RichTextContent';
 import { DocumentsSection } from '@/components/faculty/DocumentsSection';
 import { GallerySection } from '@/components/faculty/GallerySection';
 import { StatusBadge } from '@/components/faculty/StatusBadge';
@@ -352,9 +353,7 @@ function ReadOnlyView({ activity }: { activity: FacultyActivityDetail }) {
         <h2 className="mb-2 text-base font-semibold text-gray-900">
           รายละเอียด
         </h2>
-        <p className="whitespace-pre-line text-sm text-gray-700">
-          {activity.description || '—'}
-        </p>
+        <RichTextContent html={activity.description} />
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">

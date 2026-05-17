@@ -23,6 +23,8 @@ import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ParticipantsPanel } from '@/components/admin/ParticipantsPanel';
+import { RichTextContent } from '@/components/RichTextContent';
+import { RichTextEditor } from '@/components/RichTextEditor';
 import { StatusBadge } from '@/components/faculty/StatusBadge';
 import { formatActivityRange, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/lib/store';
@@ -408,9 +410,7 @@ export default function AdminActivityDetailPage() {
           <h2 className="mb-2 text-sm font-semibold text-gray-700">
             รายละเอียดกิจกรรม
           </h2>
-          <p className="whitespace-pre-wrap text-sm text-gray-700">
-            {activity.description}
-          </p>
+          <RichTextContent html={activity.description} />
         </div>
       )}
 
@@ -1054,12 +1054,10 @@ function AdminEditDialog({
             <label className="mb-1 block text-xs font-medium text-gray-700">
               รายละเอียด
             </label>
-            <textarea
-              rows={4}
+            <RichTextEditor
               value={v.description}
-              onChange={(e) => setV({ ...v, description: e.target.value })}
+              onChange={(html) => setV({ ...v, description: html })}
               disabled={busy}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
             />
           </div>
           <div>

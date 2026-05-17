@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss';
 import defaultTheme from 'tailwindcss/defaultTheme';
+import typography from '@tailwindcss/typography';
 
 const config: Config = {
   content: [
@@ -16,7 +17,9 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  // typography plugin — เปิดใช้ `prose` class สำหรับเนื้อหา rich text
+  //   (Tiptap editor + activity description display)
+  plugins: [typography],
 };
 
 export default config;

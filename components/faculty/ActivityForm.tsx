@@ -5,6 +5,7 @@ import axios from 'axios';
 import { ImagePlus, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
+import { RichTextEditor } from '@/components/RichTextEditor';
 import type { ActivityPoster, FacultyActivityDetail } from '@/lib/types';
 
 interface PosterMeta {
@@ -524,11 +525,10 @@ export function ActivityForm({
           />
         </Field>
         <Field label="รายละเอียด">
-          <textarea
+          <RichTextEditor
             value={value.description}
-            onChange={(e) => setField('description', e.target.value)}
-            rows={4}
-            className={inputClass}
+            onChange={(html) => setField('description', html)}
+            placeholder="เขียนรายละเอียดกิจกรรม — ใช้ toolbar เพื่อจัดรูปแบบหัวข้อ ตัวหนา ลิงก์ และรายการ"
           />
         </Field>
         <Field label="สถานที่จัด" required>

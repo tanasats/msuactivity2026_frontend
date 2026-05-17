@@ -22,6 +22,7 @@ import {
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { RichTextContent } from '@/components/RichTextContent';
 import { useAuthStore } from '@/lib/store';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -235,9 +236,7 @@ export default function ActivityDetailPage() {
               <h2 className="mb-2 text-lg font-semibold text-gray-900">
                 รายละเอียดกิจกรรม
               </h2>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
-                {activity.description || '—'}
-              </p>
+              <RichTextContent html={activity.description} />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
