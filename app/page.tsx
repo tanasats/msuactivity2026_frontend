@@ -156,10 +156,10 @@ export default function LandingPage() {
 
       {/* Hero + search */}
       <section className="mx-auto max-w-6xl px-6 pt-12 pb-6 text-center">
-        <h1 className="mb-4 text-3xl font-bold tracking-tight text-gray-900 md:text-5xl">
-          ระบบจัดการกิจกรรมนิสิต
-          <br className="hidden md:block" />
-          <span className="text-blue-700"> มหาวิทยาลัยมหาสารคาม</span>
+        <h1 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
+          ระบบกิจกรรมนิสิต
+          <br className="block" /> 
+          <span className="text-blue-700 text-3xl md:text-4xl">มหาวิทยาลัยมหาสารคาม</span>
         </h1>
         <p className="mx-auto mb-6 max-w-2xl text-base text-gray-600 md:text-lg">
           ค้นหาและสมัครเข้าร่วมกิจกรรม เพื่อเก็บชั่วโมง และพัฒนาทักษะตามมาตรฐานมหาวิทยาลัย
@@ -325,8 +325,8 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="mt-12 border-t border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-6 text-center text-sm text-gray-500">
-          © {new Date().getFullYear()} มหาวิทยาลัยมหาสารคาม — ระบบจัดการกิจกรรมนิสิต
-          <div className="text-small">ผู้พัฒนา: ธนศาสตร์ สุดจริง</div>
+          © {new Date().getFullYear()} มหาวิทยาลัยมหาสารคาม — ระบบกิจกรรมนิสิต v1.0.0-beta
+          <div className="text-small">ผู้พัฒนา: ธนศาสตร์ สุดจริง (tanasat.s@.msu.ac.th)</div>
         </div>
       </footer>
     </main>
