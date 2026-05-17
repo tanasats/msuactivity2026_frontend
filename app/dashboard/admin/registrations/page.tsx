@@ -19,7 +19,9 @@ import { api } from '@/lib/api';
 import { downloadAuthed } from '@/lib/download';
 import { formatNumber } from '@/lib/format';
 import { PARTICIPANT_ROLE_LABEL } from '@/lib/participant-role';
+import { useAuthStore } from '@/lib/store';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
+import { CancelCheckInDialog } from '@/components/admin/CancelCheckInDialog';
 import { RegistrationAuditDialog } from '@/components/admin/RegistrationAuditDialog';
 import type {
   AdminRegistrationRow,
@@ -69,6 +71,10 @@ export default function AdminRegistrationsPage() {
   const [pendingCancel, setPendingCancel] = useState<AdminRegistrationRow | null>(null);
   // auditing = registration ที่กำลังเปิดดูประวัติอยู่
   const [auditing, setAuditing] = useState<AdminRegistrationRow | null>(null);
+  // cancel check-in (super_admin only)
+  const [pendingCancelCheckIn, setPendingCancelCheckIn] =
+    useState<AdminRegistrationRow | null>(null);
+  const isSuperAdmin = useAuthStore((s) => s.user?.role) === 'super_admin';
 
   const ADMIN_CANCELABLE_STATUSES = new Set<RegistrationStatus>([
     'PENDING_APPROVAL',
@@ -446,7 +452,7 @@ export default function AdminRegistrationsPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <div className="flex justify-end gap-1.5">
+                        <div className="flex flex-wrap justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setAuditing(r)}
@@ -456,6 +462,20 @@ export default function AdminRegistrationsPage() {
                             <History className="h-3 w-3" aria-hidden />
                             ประวัติ
                           </button>
+                          {isSuperAdmin &&
+                            r.registration_status === 'ATTENDED' &&
+                            (r.evaluation_status === null ||
+                              r.evaluation_status === 'PENDING_EVALUATION') && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingCancelCheckIn(r)}
+                                className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                                title="ยกเลิกการเช็คอิน (กลับเป็น อนุมัติแล้ว)"
+                              >
+                                <Ban className="h-3 w-3" aria-hidden />
+                                ยกเลิกเช็คอิน
+                              </button>
+                            )}
                           {ADMIN_CANCELABLE_STATUSES.has(r.registration_status) && (
                             <button
                               type="button"
@@ -512,6 +532,17 @@ export default function AdminRegistrationsPage() {
             : undefined
         }
         onClose={() => setAuditing(null)}
+      />
+
+      <CancelCheckInDialog
+        open={!!pendingCancelCheckIn}
+        registrationId={pendingCancelCheckIn?.registration_id ?? null}
+        studentName={pendingCancelCheckIn?.student_name ?? ''}
+        onClose={() => setPendingCancelCheckIn(null)}
+        onCancelled={async () => {
+          setPendingCancelCheckIn(null);
+          await load();
+        }}
       />
     </div>
   );

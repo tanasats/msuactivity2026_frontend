@@ -33,8 +33,16 @@ const ACTION_LABEL: Record<
     text: 'เจ้าหน้าที่เช็คอินแทน',
     tone: 'bg-blue-50 text-blue-700',
   },
+  cancel_check_in: {
+    text: 'ยกเลิกเช็คอิน',
+    tone: 'bg-rose-50 text-rose-700',
+  },
   no_show: { text: 'ไม่เข้าร่วม', tone: 'bg-gray-200 text-gray-800' },
   evaluate: { text: 'ประเมินผล', tone: 'bg-violet-50 text-violet-700' },
+  revert_evaluation: {
+    text: 'ยกเลิกผลประเมิน',
+    tone: 'bg-amber-50 text-amber-700',
+  },
   change_role: {
     text: 'เปลี่ยนสถานภาพ',
     tone: 'bg-amber-50 text-amber-700',

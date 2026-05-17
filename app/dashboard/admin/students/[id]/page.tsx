@@ -19,7 +19,9 @@ import { api } from '@/lib/api';
 import { downloadAuthed } from '@/lib/download';
 import { formatNumber } from '@/lib/format';
 import { PARTICIPANT_ROLE_LABEL } from '@/lib/participant-role';
+import { useAuthStore } from '@/lib/store';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
+import { CancelCheckInDialog } from '@/components/admin/CancelCheckInDialog';
 import { RegistrationAuditDialog } from '@/components/admin/RegistrationAuditDialog';
 import type {
   AdminStudentDetail,
@@ -56,6 +58,10 @@ export default function AdminStudentDetailPage() {
   const [pendingCancel, setPendingCancel] = useState<AdminStudentRegistration | null>(null);
   // auditing = registration ที่กำลังเปิดดูประวัติอยู่
   const [auditing, setAuditing] = useState<AdminStudentRegistration | null>(null);
+  // cancel check-in (super_admin only)
+  const [pendingCancelCheckIn, setPendingCancelCheckIn] =
+    useState<AdminStudentRegistration | null>(null);
+  const isSuperAdmin = useAuthStore((s) => s.user?.role) === 'super_admin';
 
   async function reload() {
     if (!id) return;
@@ -369,8 +375,10 @@ export default function AdminStudentDetailPage() {
                   <RegistrationRow
                     key={r.registration_id}
                     r={r}
+                    canCancelCheckIn={isSuperAdmin}
                     onAskCancel={() => setPendingCancel(r)}
                     onViewAudit={() => setAuditing(r)}
+                    onAskCancelCheckIn={() => setPendingCancelCheckIn(r)}
                   />
                 ))}
               </tbody>
@@ -406,6 +414,17 @@ export default function AdminStudentDetailPage() {
         }
         onClose={() => setAuditing(null)}
       />
+
+      <CancelCheckInDialog
+        open={!!pendingCancelCheckIn}
+        registrationId={pendingCancelCheckIn?.registration_id ?? null}
+        studentName={data.user.full_name}
+        onClose={() => setPendingCancelCheckIn(null)}
+        onCancelled={async () => {
+          setPendingCancelCheckIn(null);
+          await reload();
+        }}
+      />
     </div>
   );
 }
@@ -430,16 +449,26 @@ const ADMIN_CANCELABLE_REG = new Set([
 
 function RegistrationRow({
   r,
+  canCancelCheckIn,
   onAskCancel,
   onViewAudit,
+  onAskCancelCheckIn,
 }: {
   r: AdminStudentRegistration;
+  canCancelCheckIn: boolean;
   onAskCancel: () => void;
   onViewAudit: () => void;
+  onAskCancelCheckIn: () => void;
 }) {
   const regLabel = REG_STATUS_LABEL[r.registration_status];
   const evalLabel = r.evaluation_status ? EVAL_LABEL[r.evaluation_status] : null;
   const canCancel = ADMIN_CANCELABLE_REG.has(r.registration_status);
+  // ยกเลิกเช็คอินได้เฉพาะตอน ATTENDED + ยังไม่ประเมิน (block ถ้า PASSED/FAILED)
+  const canRevertCheckIn =
+    canCancelCheckIn &&
+    r.registration_status === 'ATTENDED' &&
+    (r.evaluation_status === null ||
+      r.evaluation_status === 'PENDING_EVALUATION');
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-3 py-2 font-mono text-xs text-gray-500">
@@ -504,7 +533,7 @@ function RegistrationRow({
         )}
       </td>
       <td className="px-3 py-2 text-right">
-        <div className="flex justify-end gap-1.5">
+        <div className="flex flex-wrap justify-end gap-1.5">
           <button
             type="button"
             onClick={onViewAudit}
@@ -514,6 +543,17 @@ function RegistrationRow({
             <History className="h-3 w-3" aria-hidden />
             ประวัติ
           </button>
+          {canRevertCheckIn && (
+            <button
+              type="button"
+              onClick={onAskCancelCheckIn}
+              className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+              title="ยกเลิกการเช็คอิน (กลับเป็น อนุมัติแล้ว)"
+            >
+              <Ban className="h-3 w-3" aria-hidden />
+              ยกเลิกเช็คอิน
+            </button>
+          )}
           {canCancel && (
             <button
               type="button"

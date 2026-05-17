@@ -251,7 +251,9 @@ export type ActivityAuditAction =
   | 'approve_registration'
   | 'cancel_registration'
   | 'evaluate_registration'
+  | 'revert_evaluation'
   | 'staff_check_in'
+  | 'cancel_check_in'
   | 'bulk_add_registration'
   | 'bulk_approve_registration'
   | 'bulk_evaluate_registration'
@@ -345,8 +347,10 @@ export type RegistrationAuditAction =
   | 'cancel_by_staff'
   | 'check_in'
   | 'staff_check_in'
+  | 'cancel_check_in'
   | 'no_show'
   | 'evaluate'
+  | 'revert_evaluation'
   | 'change_role';
 
 export interface RegistrationAuditEntry {

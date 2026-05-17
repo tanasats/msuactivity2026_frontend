@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  Download,
   QrCode,
   Search,
   UserCog,
@@ -16,6 +17,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAuthed } from '@/lib/download';
 import { toast } from '@/lib/toast';
 import { BulkAddDialog } from '@/components/faculty/BulkAddDialog';
 import { BulkEvaluateDialog } from '@/components/faculty/BulkEvaluateDialog';
@@ -107,6 +109,14 @@ export default function FacultyRegistrationsPage() {
     useState<FacultyRegistration | null>(null);
   const [pendingBulkCheckIn, setPendingBulkCheckIn] =
     useState<number[] | null>(null);
+  // pending cancel-check-in: เก็บ reg + ให้ user ใส่เหตุผล
+  const [pendingCancelCheckIn, setPendingCancelCheckIn] =
+    useState<FacultyRegistration | null>(null);
+  const [cancelCheckInReason, setCancelCheckInReason] = useState('');
+  // pending revert-evaluation: เก็บ reg + เหตุผล (optional)
+  const [pendingRevertEval, setPendingRevertEval] =
+    useState<FacultyRegistration | null>(null);
+  const [revertEvalReason, setRevertEvalReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
 
@@ -433,6 +443,58 @@ export default function FacultyRegistrationsPage() {
     }
   }
 
+  async function executeRevertEval() {
+    if (!pendingRevertEval || !id) return;
+    setBusy(true);
+    try {
+      const body: { reason?: string } = {};
+      const trimmed = revertEvalReason.trim();
+      if (trimmed) body.reason = trimmed;
+      await api.post(
+        `/api/faculty/activities/${id}/registrations/${pendingRevertEval.registration_id}/revert-evaluation`,
+        body,
+      );
+      toast.success(
+        `ยกเลิกผลประเมินของ ${pendingRevertEval.student_name} แล้ว — กลับเป็น "รอประเมิน"`,
+      );
+      setPendingRevertEval(null);
+      setRevertEvalReason('');
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'ยกเลิกผลประเมินไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function executeCancelCheckIn() {
+    if (!pendingCancelCheckIn || !id) return;
+    const reason = cancelCheckInReason.trim();
+    if (!reason) {
+      toast.error('โปรดระบุเหตุผลในการยกเลิกเช็คอิน');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(
+        `/api/faculty/activities/${id}/registrations/${pendingCancelCheckIn.registration_id}/cancel-check-in`,
+        { reason },
+      );
+      toast.success(
+        `ยกเลิกเช็คอินของ ${pendingCancelCheckIn.student_name} แล้ว — สถานะกลับเป็น "อนุมัติแล้ว"`,
+      );
+      setPendingCancelCheckIn(null);
+      setCancelCheckInReason('');
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'ยกเลิกเช็คอินไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error) {
     return (
       <div className="mx-auto max-w-6xl p-6 md:p-8">
@@ -475,14 +537,32 @@ export default function FacultyRegistrationsPage() {
           )}
         </div>
         {canManage && (
-          <button
-            type="button"
-            onClick={() => setShowBulkAdd(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-          >
-            <UserPlus className="h-4 w-4" aria-hidden />
-            เพิ่มรายชื่อ
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                id &&
+                downloadAuthed(
+                  `/api/faculty/activities/${id}/registrations.xlsx`,
+                  `participants-${id}.xlsx`,
+                )
+              }
+              disabled={!items || items.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              title="ส่งออกรายชื่อผู้เข้าร่วมเป็น Excel"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              ส่งออก Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBulkAdd(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            >
+              <UserPlus className="h-4 w-4" aria-hidden />
+              เพิ่มรายชื่อ
+            </button>
+          </div>
         )}
       </div>
 
@@ -780,6 +860,14 @@ export default function FacultyRegistrationsPage() {
                     onCancel={() => setPendingCancel(r)}
                     onCheckIn={() => setPendingCheckIn(r)}
                     onEvaluate={() => setPendingEvaluate(r)}
+                    onCancelCheckIn={() => {
+                      setCancelCheckInReason('');
+                      setPendingCancelCheckIn(r);
+                    }}
+                    onRevertEval={() => {
+                      setRevertEvalReason('');
+                      setPendingRevertEval(r);
+                    }}
                   />
                 ))}
               </tbody>
@@ -868,6 +956,92 @@ export default function FacultyRegistrationsPage() {
         loading={busy}
         onConfirm={executeBulkCheckIn}
         onCancel={() => setPendingBulkCheckIn(null)}
+      />
+
+      {/* Revert evaluation — เหตุผลเป็น optional */}
+      <ConfirmDialog
+        open={!!pendingRevertEval}
+        tone="danger"
+        title="ยกเลิกผลประเมิน?"
+        message={
+          pendingRevertEval && (
+            <div className="space-y-3">
+              <p>
+                ยกเลิกผลประเมิน{' '}
+                <strong>
+                  {pendingRevertEval.evaluation_status === 'PASSED'
+                    ? '"ผ่าน"'
+                    : '"ไม่ผ่าน"'}
+                </strong>{' '}
+                ของ <strong>{pendingRevertEval.student_name}</strong> —
+                สถานะผลประเมินจะกลับเป็น <strong>"รอประเมิน"</strong>{' '}
+                และข้อมูลผู้ประเมินจะถูกล้าง
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-700">
+                  เหตุผล{' '}
+                  <span className="font-normal text-gray-400">(ไม่บังคับ)</span>
+                </span>
+                <textarea
+                  value={revertEvalReason}
+                  onChange={(e) => setRevertEvalReason(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  placeholder="เช่น ประเมินผิด, ต้องการทบทวนผลใหม่"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  autoFocus
+                />
+              </label>
+            </div>
+          )
+        }
+        confirmLabel="ยกเลิกผลประเมิน"
+        loading={busy}
+        onConfirm={executeRevertEval}
+        onCancel={() => {
+          setPendingRevertEval(null);
+          setRevertEvalReason('');
+        }}
+      />
+
+      {/* Cancel check-in — ต้องระบุเหตุผล */}
+      <ConfirmDialog
+        open={!!pendingCancelCheckIn}
+        tone="danger"
+        title="ยกเลิกการเช็คอิน?"
+        message={
+          pendingCancelCheckIn && (
+            <div className="space-y-3">
+              <p>
+                ยกเลิกการเช็คอินของ{' '}
+                <strong>{pendingCancelCheckIn.student_name}</strong> — สถานะจะกลับเป็น{' '}
+                <strong>"อนุมัติแล้ว"</strong> และหลักฐาน attendance จะถูก mark
+                INVALID (เก็บ history)
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-700">
+                  เหตุผล (จำเป็น)
+                </span>
+                <textarea
+                  value={cancelCheckInReason}
+                  onChange={(e) => setCancelCheckInReason(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="เช่น สแกน QR ผิดคน, นิสิตไม่ได้เข้าร่วมจริง"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                  autoFocus
+                />
+              </label>
+            </div>
+          )
+        }
+        confirmLabel="ยกเลิกเช็คอิน"
+        loading={busy}
+        onConfirm={executeCancelCheckIn}
+        onCancel={() => {
+          setPendingCancelCheckIn(null);
+          setCancelCheckInReason('');
+        }}
       />
 
       <BulkAddDialog
@@ -987,6 +1161,8 @@ function RegistrationRow({
   onCancel,
   onCheckIn,
   onEvaluate,
+  onCancelCheckIn,
+  onRevertEval,
 }: {
   reg: FacultyRegistration;
   canManage: boolean;
@@ -997,6 +1173,8 @@ function RegistrationRow({
   onCancel: () => void;
   onCheckIn: () => void;
   onEvaluate: () => void;
+  onCancelCheckIn: () => void;
+  onRevertEval: () => void;
 }) {
   const meta = STATUS_LABELS[reg.registration_status];
   const isPending = reg.registration_status === 'PENDING_APPROVAL';
@@ -1122,17 +1300,47 @@ function RegistrationRow({
           </div>
         )}
         {canManage && isAttended && (
-          <button
-            type="button"
-            onClick={onEvaluate}
-            disabled={busy}
-            className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            <ClipboardCheck className="h-3.5 w-3.5" aria-hidden />
-            {reg.evaluation_status === 'PENDING_EVALUATION'
-              ? 'ประเมินผล'
-              : 'แก้ไขผล'}
-          </button>
+          <div className="flex flex-wrap justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={onEvaluate}
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" aria-hidden />
+              {reg.evaluation_status === 'PENDING_EVALUATION'
+                ? 'ประเมินผล'
+                : 'แก้ไขผล'}
+            </button>
+            {/* ยกเลิกผลประเมินได้เฉพาะตอนประเมินไปแล้ว (PASSED/FAILED) — กลับเป็น "รอประเมิน" */}
+            {(reg.evaluation_status === 'PASSED' ||
+              reg.evaluation_status === 'FAILED') && (
+              <button
+                type="button"
+                onClick={onRevertEval}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                title="ยกเลิกผลประเมิน (กลับเป็น 'รอประเมิน')"
+              >
+                <XCircle className="h-3.5 w-3.5" aria-hidden />
+                ยกเลิกผลประเมิน
+              </button>
+            )}
+            {/* ยกเลิกเช็คอินได้เฉพาะยังไม่ประเมิน (กันกระทบชั่วโมง) */}
+            {(reg.evaluation_status === null ||
+              reg.evaluation_status === 'PENDING_EVALUATION') && (
+              <button
+                type="button"
+                onClick={onCancelCheckIn}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                title="ยกเลิกการเช็คอิน (กลับเป็น อนุมัติแล้ว)"
+              >
+                <XCircle className="h-3.5 w-3.5" aria-hidden />
+                ยกเลิกเช็คอิน
+              </button>
+            )}
+          </div>
         )}
       </td>
     </tr>
