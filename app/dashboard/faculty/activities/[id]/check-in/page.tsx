@@ -283,7 +283,7 @@ function CameraScanner({
       <div
         id={SCANNER_ELEMENT_ID}
         className="overflow-hidden rounded-xl bg-black"
-        style={{ minHeight: 320 }}
+        style={{ minHeight: '150px'}}
       />
       {error && (
         <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">

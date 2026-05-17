@@ -141,7 +141,7 @@ export default function LandingPage() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
             >
               <LayoutDashboard className="h-4 w-4" aria-hidden />
-              กลับไปที่ Dashboard
+              <span className="hidden sm:inline-block">กลับไปที่</span> Dashboard
             </Link>
           ) : (
             <Link
@@ -205,7 +205,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Stats — 2 cards */}
+{/* Stats — 2 cards --ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
+{!isSearching && (
+      <>
       <section className="mx-auto max-w-6xl px-6 py-6">
         {error && (
           <div className="mx-auto max-w-md rounded-lg bg-rose-50 p-4 text-center text-sm text-rose-700">
@@ -241,15 +243,26 @@ export default function LandingPage() {
           </div>
         )}
       </section>
+      </>
+)}
 
-      {/* Charts — by year / by category / by skill (3 horizontal bars, blue tone) */}
-      {data && (
-        <section className="mx-auto grid max-w-6xl gap-5 px-6 py-6 lg:grid-cols-3">
-          <ByYearChart data={data.stats.by_year} />
-          <ByCategoryChart data={data.stats.by_category} />
-          <BySkillChart data={data.stats.by_skill} />
-        </section>
+
+      {/* Open + Upcoming — ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
+      {!isSearching && (
+      <>
+      <div className="hidden sm:block">
+        {/* Charts — by year / by category / by skill (3 horizontal bars, blue tone) */}
+        {data && (
+          <section className="mx-auto grid max-w-6xl gap-5 px-6 py-6 lg:grid-cols-3">
+            <ByYearChart data={data.stats.by_year} />
+            <ByCategoryChart data={data.stats.by_category} />
+            <BySkillChart data={data.stats.by_skill} />
+          </section>
+        )}     
+      </div>
+      </> 
       )}
+
 
       {/* Search results — โชว์เฉพาะตอน searching (q ≥ 2 ตัว); แทนที่ open+upcoming */}
       {isSearching && (
