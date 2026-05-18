@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Ban,
   ChevronLeft,
@@ -56,6 +57,9 @@ const EVAL_LABEL: Record<EvaluationStatus, { text: string; tone: string }> = {
 };
 
 export default function AdminRegistrationsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [items, setItems] = useState<AdminRegistrationRow[] | null>(null);
   const [total, setTotal] = useState<number | null>(null);
   const [offset, setOffset] = useState(0);
@@ -69,6 +73,18 @@ export default function AdminRegistrationsPage() {
   const [regStatus, setRegStatus] = useState<RegistrationStatus | 'all'>('all');
   const [evalStatus, setEvalStatus] = useState<EvaluationStatus | 'all'>('all');
   const [academicYear, setAcademicYear] = useState<number | 'all'>('all');
+
+  // activity_id filter — มาจาก URL (?activity_id=123) เมื่อ user คลิกจากหน้า activity detail
+  //   - state คือ source of truth — URL ใช้แค่ init
+  //   - มี chip แสดงในแถบ filter พร้อมปุ่ม X เพื่อเคลียร์
+  const initialActivityId = (() => {
+    const raw = searchParams?.get('activity_id');
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  })();
+  const [activityId, setActivityId] = useState<number | null>(initialActivityId);
+  const [activityTitle, setActivityTitle] = useState<string | null>(null);
   const [pendingCancel, setPendingCancel] = useState<AdminRegistrationRow | null>(null);
   // auditing = registration ที่กำลังเปิดดูประวัติอยู่
   const [auditing, setAuditing] = useState<AdminRegistrationRow | null>(null);
@@ -100,6 +116,27 @@ export default function AdminRegistrationsPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // โหลดชื่อกิจกรรมแยกต่างหาก — ใช้ใน chip filter (ไม่ใช่ใน list query)
+  //   ถ้า fetch ล้มเหลว fallback แสดง "กิจกรรม #ID" ใน chip
+  useEffect(() => {
+    if (activityId === null) {
+      setActivityTitle(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<{ title: string }>(`/api/admin/activities/${activityId}`)
+      .then((r) => {
+        if (!cancelled) setActivityTitle(r.data.title);
+      })
+      .catch(() => {
+        /* ignore — fallback ใน chip */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activityId]);
+
   const fetchSeq = useRef(0);
   const load = useCallback(async () => {
     const seq = ++fetchSeq.current;
@@ -115,6 +152,7 @@ export default function AdminRegistrationsPage() {
         regStatus,
         evalStatus,
         academicYear,
+        activityId,
       });
       const res = await api.get<{
         items: AdminRegistrationRow[];
@@ -138,6 +176,7 @@ export default function AdminRegistrationsPage() {
     regStatus,
     evalStatus,
     academicYear,
+    activityId,
   ]);
 
   useEffect(() => {
@@ -147,7 +186,15 @@ export default function AdminRegistrationsPage() {
   // filter change → reset offset
   useEffect(() => {
     setOffset(0);
-  }, [search, studentFacultyId, activityFacultyId, regStatus, evalStatus, academicYear]);
+  }, [
+    search,
+    studentFacultyId,
+    activityFacultyId,
+    regStatus,
+    evalStatus,
+    academicYear,
+    activityId,
+  ]);
 
   const totalPages = total && total > 0 ? Math.ceil(total / PAGE_SIZE) : 0;
   const currentPage = totalPages > 0 ? Math.floor(offset / PAGE_SIZE) + 1 : 1;
@@ -163,6 +210,7 @@ export default function AdminRegistrationsPage() {
       regStatus,
       evalStatus,
       academicYear,
+      activityId,
     });
     const url = params
       ? `/api/admin/registrations.csv?${params}`
@@ -178,6 +226,16 @@ export default function AdminRegistrationsPage() {
     setRegStatus('all');
     setEvalStatus('all');
     setAcademicYear('all');
+    clearActivityFilter();
+  }
+
+  // เคลียร์ activity filter — รวมลบ ?activity_id= ออกจาก URL ด้วย (ป้องกัน refresh แล้วกลับมา)
+  function clearActivityFilter() {
+    setActivityId(null);
+    setActivityTitle(null);
+    if (searchParams?.get('activity_id')) {
+      router.replace('/dashboard/admin/registrations');
+    }
   }
 
   return (
@@ -210,6 +268,28 @@ export default function AdminRegistrationsPage() {
       {error && (
         <div className="mb-4 rounded-lg bg-rose-50 p-4 text-sm text-rose-700">
           {error}
+        </div>
+      )}
+
+      {/* Active activity filter chip — แสดงเมื่อมาจากลิงก์ในหน้า activity detail */}
+      {activityId !== null && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+          <span className="text-xs text-indigo-700">กำลังกรองเฉพาะกิจกรรม:</span>
+          <Link
+            href={`/dashboard/admin/activities/${activityId}`}
+            className="font-medium hover:underline"
+          >
+            {activityTitle ?? `#${activityId}`}
+          </Link>
+          <button
+            type="button"
+            onClick={clearActivityFilter}
+            className="ml-1 inline-flex items-center gap-1 rounded-md border border-indigo-300 bg-white px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+            title="ล้างตัวกรองกิจกรรม"
+          >
+            <X className="h-3 w-3" aria-hidden />
+            ล้าง
+          </button>
         </div>
       )}
 
@@ -595,6 +675,7 @@ function buildParams(o: {
   regStatus: RegistrationStatus | 'all';
   evalStatus: EvaluationStatus | 'all';
   academicYear: number | 'all';
+  activityId: number | null;
 }): string {
   const p = new URLSearchParams();
   if (o.limit !== undefined) p.set('limit', String(o.limit));
@@ -607,6 +688,7 @@ function buildParams(o: {
   if (o.regStatus !== 'all') p.set('status', o.regStatus);
   if (o.evalStatus !== 'all') p.set('evaluation_status', o.evalStatus);
   if (o.academicYear !== 'all') p.set('academic_year', String(o.academicYear));
+  if (o.activityId !== null) p.set('activity_id', String(o.activityId));
   return p.toString();
 }
 
