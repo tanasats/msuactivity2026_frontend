@@ -192,6 +192,14 @@ export interface AdminStudentAggregateStats {
     hours: number;
     passed_count: number;
   }[];
+  // by_skill — ทักษะที่นิสิตได้รับสะสม (rollup ระดับ parent ข้ามปี)
+  by_skill: {
+    skill_id: number;
+    skill_code: string;
+    skill_name: string;
+    count: number;   // จำนวนกิจกรรมที่นิสิตได้รับทักษะนี้
+    hours: number;   // ชั่วโมงรวมของกิจกรรมที่ให้ทักษะนี้
+  }[];
 }
 
 export interface AdminStudentRegistration {

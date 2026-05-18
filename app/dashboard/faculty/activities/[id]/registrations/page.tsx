@@ -52,17 +52,30 @@ const EVALUATION_LABELS: Record<EvaluationStatus, { th: string; tone: string }> 
   FAILED: { th: 'ไม่ผ่าน', tone: 'bg-rose-100 text-rose-800' },
 };
 
-type Filter = 'all' | 'pending' | 'registered' | 'cancelled' | 'attended';
+type Filter =
+  | 'all'
+  | 'pending'
+  | 'registered'
+  | 'cancelled'
+  | 'attended'
+  | 'pending_eval';
 
 const FILTER_OPTIONS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'pending', label: 'รออนุมัติ' },
   { value: 'registered', label: 'อนุมัติแล้ว' },
   { value: 'attended', label: 'เช็คอินแล้ว' },
+  { value: 'pending_eval', label: 'รอประเมิน' },
   { value: 'cancelled', label: 'ยกเลิก/ปฏิเสธ' },
 ];
 
-const FILTER_STATUSES: Record<Filter, RegistrationStatus[] | null> = {
+// FILTER_STATUSES: ใช้ status-only filter (null = ทั้งหมด)
+//   pending_eval ใช้ custom predicate (status=ATTENDED + evaluation_status=PENDING_EVALUATION)
+//   ไม่อยู่ในตารางนี้
+const FILTER_STATUSES: Record<
+  Exclude<Filter, 'pending_eval'>,
+  RegistrationStatus[] | null
+> = {
   all: null,
   pending: ['PENDING_APPROVAL'],
   registered: ['REGISTERED'],
@@ -151,8 +164,17 @@ export default function FacultyRegistrationsPage() {
   }, [id]);
 
   // 1. filter ตาม status tab
+  //    pending_eval = ATTENDED + evaluation_status = 'PENDING_EVALUATION' (custom predicate)
+  //    อื่น ๆ ใช้ FILTER_STATUSES (status-only)
   const filteredItems = useMemo(() => {
     if (!items) return null;
+    if (filter === 'pending_eval') {
+      return items.filter(
+        (r) =>
+          r.registration_status === 'ATTENDED' &&
+          r.evaluation_status === 'PENDING_EVALUATION',
+      );
+    }
     const allowed = FILTER_STATUSES[filter];
     if (!allowed) return items;
     return items.filter((r) => allowed.includes(r.registration_status));
@@ -306,6 +328,11 @@ export default function FacultyRegistrationsPage() {
       pending: items.filter((r) => r.registration_status === 'PENDING_APPROVAL').length,
       registered: items.filter((r) => r.registration_status === 'REGISTERED').length,
       attended: items.filter((r) => r.registration_status === 'ATTENDED').length,
+      pending_eval: items.filter(
+        (r) =>
+          r.registration_status === 'ATTENDED' &&
+          r.evaluation_status === 'PENDING_EVALUATION',
+      ).length,
       cancelled: items.filter((r) =>
         FILTER_STATUSES.cancelled!.includes(r.registration_status),
       ).length,

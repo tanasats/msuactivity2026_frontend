@@ -23,6 +23,13 @@ import { useAuthStore } from '@/lib/store';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
 import { CancelCheckInDialog } from '@/components/admin/CancelCheckInDialog';
 import { RegistrationAuditDialog } from '@/components/admin/RegistrationAuditDialog';
+import { RevertEvalDialog } from '@/components/admin/RevertEvalDialog';
+import {
+  CHART_CARD,
+  ChartHeader,
+  ProportionBar,
+  RAINBOW_PALETTE,
+} from '@/components/charts/proportion-chart';
 import type {
   AdminStudentDetail,
   AdminStudentRegistration,
@@ -60,6 +67,9 @@ export default function AdminStudentDetailPage() {
   const [auditing, setAuditing] = useState<AdminStudentRegistration | null>(null);
   // cancel check-in (super_admin only)
   const [pendingCancelCheckIn, setPendingCancelCheckIn] =
+    useState<AdminStudentRegistration | null>(null);
+  // revert evaluation (super_admin only)
+  const [pendingRevertEval, setPendingRevertEval] =
     useState<AdminStudentRegistration | null>(null);
   const isSuperAdmin = useAuthStore((s) => s.user?.role) === 'super_admin';
 
@@ -138,7 +148,7 @@ export default function AdminStudentDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-6 md:p-8">
+    <div className="mx-auto max-w-full p-6 md:p-8">
       <BackLink />
 
       {/* Profile header */}
@@ -235,80 +245,93 @@ export default function AdminStudentDetailPage() {
         />
       </section>
 
-      {/* By year + by category */}
-      {(stats.by_year.length > 0 || stats.by_category.some((c) => c.passed_count > 0)) && (
-        <section className="mt-5 grid gap-5 lg:grid-cols-2">
-          {/* By year */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold text-gray-700">
-              ชั่วโมงต่อปีการศึกษา
-            </h3>
-            {stats.by_year.length === 0 ? (
-              <p className="text-xs text-gray-400">ยังไม่มีข้อมูล</p>
-            ) : (
-              <div className="space-y-2">
-                {stats.by_year.map((y) => {
-                  const max = Math.max(1, ...stats.by_year.map((x) => Number(x.hours)));
-                  const pct = (Number(y.hours) / max) * 100;
-                  return (
-                    <div key={y.academic_year} className="flex items-center gap-3">
-                      <span className="w-12 shrink-0 text-right font-mono text-xs text-gray-500">
-                        {y.academic_year}
-                      </span>
-                      <div className="h-5 flex-1 overflow-hidden rounded-md bg-gray-100">
-                        <div
-                          className="h-full bg-blue-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="w-20 shrink-0 text-right text-xs tabular-nums text-gray-700">
-                        {formatNumber(Number(y.hours))} ชม.
-                        <span className="ml-1 text-gray-400">
-                          ({y.passed_count})
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* By category */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold text-gray-700">
-              ชั่วโมงตามหมวด
-            </h3>
-            <div className="space-y-2">
-              {stats.by_category.map((c) => {
-                const max = Math.max(
-                  1,
-                  ...stats.by_category.map((x) => Number(x.hours)),
-                );
-                const pct = (Number(c.hours) / max) * 100;
-                const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500'];
+      {/* Charts — by year / by category / by skill (rainbow palette, consistent with landing) */}
+      <section className="mt-5 grid gap-5 lg:grid-cols-3">
+        {/* By year — proportion bar (single sky color — time series) */}
+        <div className={CHART_CARD}>
+          <ChartHeader title="ชั่วโมงต่อปีการศึกษา" />
+          {stats.by_year.length === 0 ? (
+            <p className="text-xs text-gray-400">ยังไม่มีข้อมูล</p>
+          ) : (
+            <div className="space-y-3">
+              {stats.by_year.map((y) => {
+                const max = Math.max(1, ...stats.by_year.map((x) => Number(x.hours)));
                 return (
-                  <div key={c.category_id}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="truncate text-gray-700">{c.category_name}</span>
-                      <span className="ml-2 shrink-0 tabular-nums text-gray-600">
-                        {formatNumber(Number(c.hours))} ชม.{' '}
-                        <span className="text-gray-400">({c.passed_count})</span>
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                      <div
-                        className={`h-full rounded-full ${colors[(c.category_code - 1) % colors.length]}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
+                  <ProportionBar
+                    key={y.academic_year}
+                    label={`ปี ${y.academic_year}`}
+                    count={Number(y.hours)}
+                    total={0}
+                    max={max}
+                    colorClass="bg-sky-400"
+                    countSuffix="ชม."
+                  />
                 );
               })}
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+
+        {/* By category — rainbow palette, sort desc */}
+        <div className={CHART_CARD}>
+          <ChartHeader title="ชั่วโมงตามหมวด" />
+          {stats.by_category.every((c) => c.passed_count === 0) ? (
+            <p className="text-xs text-gray-400">ยังไม่มีข้อมูล</p>
+          ) : (
+            <div className="space-y-3">
+              {[...stats.by_category]
+                .sort((a, b) => Number(b.hours) - Number(a.hours))
+                .map((c, i) => {
+                  const max = Math.max(
+                    1,
+                    ...stats.by_category.map((x) => Number(x.hours)),
+                  );
+                  return (
+                    <ProportionBar
+                      key={c.category_id}
+                      label={c.category_name}
+                      count={Number(c.hours)}
+                      total={0}
+                      max={max}
+                      colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
+                      countSuffix="ชม."
+                    />
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        {/* By skill — ทักษะที่ได้รับสะสม (rollup parent), rainbow palette */}
+        <div className={CHART_CARD}>
+          <ChartHeader
+            title="ทักษะที่ได้รับ"
+            subtitle="rollup ระดับแม่ — รวมทุกปี"
+          />
+          {stats.by_skill.every((s) => s.count === 0) ? (
+            <p className="text-xs text-gray-400">ยังไม่มีทักษะที่ได้รับ</p>
+          ) : (
+            <div className="space-y-3">
+              {[...stats.by_skill]
+                .sort((a, b) => b.count - a.count)
+                .map((s, i) => {
+                  const max = Math.max(1, ...stats.by_skill.map((x) => x.count));
+                  return (
+                    <ProportionBar
+                      key={s.skill_id}
+                      label={`${s.skill_code} · ${s.skill_name}`}
+                      count={s.count}
+                      total={0}
+                      max={max}
+                      colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
+                      countSuffix="กิจกรรม"
+                    />
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Registrations list with filters */}
       <section className="mt-6">
@@ -375,10 +398,13 @@ export default function AdminStudentDetailPage() {
                   <RegistrationRow
                     key={r.registration_id}
                     r={r}
+                    canCancel={isSuperAdmin}
                     canCancelCheckIn={isSuperAdmin}
+                    canRevertEval={isSuperAdmin}
                     onAskCancel={() => setPendingCancel(r)}
                     onViewAudit={() => setAuditing(r)}
                     onAskCancelCheckIn={() => setPendingCancelCheckIn(r)}
+                    onAskRevertEval={() => setPendingRevertEval(r)}
                   />
                 ))}
               </tbody>
@@ -425,6 +451,23 @@ export default function AdminStudentDetailPage() {
           await reload();
         }}
       />
+
+      <RevertEvalDialog
+        open={!!pendingRevertEval}
+        registrationId={pendingRevertEval?.registration_id ?? null}
+        studentName={data.user.full_name}
+        previousResult={
+          pendingRevertEval?.evaluation_status === 'PASSED' ||
+          pendingRevertEval?.evaluation_status === 'FAILED'
+            ? pendingRevertEval.evaluation_status
+            : null
+        }
+        onClose={() => setPendingRevertEval(null)}
+        onReverted={async () => {
+          setPendingRevertEval(null);
+          await reload();
+        }}
+      />
     </div>
   );
 }
@@ -441,34 +484,44 @@ function BackLink() {
   );
 }
 
-const ADMIN_CANCELABLE_REG = new Set([
-  'PENDING_APPROVAL',
-  'REGISTERED',
-  'ATTENDED',
-]);
+// cancel เฉพาะ status ที่ไม่มี side effects (ATTENDED ต้องผ่าน chain)
+const ADMIN_CANCELABLE_REG = new Set(['PENDING_APPROVAL', 'REGISTERED']);
 
 function RegistrationRow({
   r,
+  canCancel: canCancelByRole,
   canCancelCheckIn,
+  canRevertEval,
   onAskCancel,
   onViewAudit,
   onAskCancelCheckIn,
+  onAskRevertEval,
 }: {
   r: AdminStudentRegistration;
+  canCancel: boolean;
   canCancelCheckIn: boolean;
+  canRevertEval: boolean;
   onAskCancel: () => void;
   onViewAudit: () => void;
   onAskCancelCheckIn: () => void;
+  onAskRevertEval: () => void;
 }) {
   const regLabel = REG_STATUS_LABEL[r.registration_status];
   const evalLabel = r.evaluation_status ? EVAL_LABEL[r.evaluation_status] : null;
-  const canCancel = ADMIN_CANCELABLE_REG.has(r.registration_status);
+  // cancel ได้เมื่อ: role อนุญาต (super_admin) + status อยู่ใน set ที่ cancel ได้
+  const canCancel =
+    canCancelByRole && ADMIN_CANCELABLE_REG.has(r.registration_status);
   // ยกเลิกเช็คอินได้เฉพาะตอน ATTENDED + ยังไม่ประเมิน (block ถ้า PASSED/FAILED)
   const canRevertCheckIn =
     canCancelCheckIn &&
     r.registration_status === 'ATTENDED' &&
     (r.evaluation_status === null ||
       r.evaluation_status === 'PENDING_EVALUATION');
+  // ยกเลิกผลประเมินได้เฉพาะตอน ATTENDED + PASSED/FAILED
+  const canShowRevertEval =
+    canRevertEval &&
+    r.registration_status === 'ATTENDED' &&
+    (r.evaluation_status === 'PASSED' || r.evaluation_status === 'FAILED');
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-3 py-2 font-mono text-xs text-gray-500">
@@ -543,6 +596,17 @@ function RegistrationRow({
             <History className="h-3 w-3" aria-hidden />
             ประวัติ
           </button>
+          {canShowRevertEval && (
+            <button
+              type="button"
+              onClick={onAskRevertEval}
+              className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50"
+              title="ยกเลิกผลประเมิน (กลับเป็น 'รอประเมิน')"
+            >
+              <Ban className="h-3 w-3" aria-hidden />
+              ยกเลิกผลประเมิน
+            </button>
+          )}
           {canRevertCheckIn && (
             <button
               type="button"

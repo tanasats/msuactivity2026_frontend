@@ -14,6 +14,12 @@ import {
 import type { ActivitySummary, LandingStats } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
 import { ActivityCard } from '@/components/ActivityCard';
+import {
+  CHART_CARD,
+  ChartHeader,
+  ProportionBar,
+  RAINBOW_PALETTE,
+} from '@/components/charts/proportion-chart';
 import { useAuthStore } from '@/lib/store';
 import { useAuthBootstrap } from '@/lib/auth-bootstrap';
 
@@ -393,32 +399,6 @@ function StatCard({
 //   - shape: horizontal bar (อ่านง่าย, scan เร็ว, รองรับ label ไทยยาว)
 //   - card shell: rounded-2xl + border-gray-200 + p-5 + shadow-sm
 
-const CHART_CARD =
-  'rounded-2xl border border-gray-200 bg-white p-5 shadow-sm';
-
-const RAINBOW_PALETTE = [
-  'bg-rose-400',
-  'bg-amber-400',
-  'bg-emerald-400',
-  'bg-sky-400',
-  'bg-violet-400',
-];
-
-function ChartHeader({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <div className="mb-4">
-      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-      {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
-    </div>
-  );
-}
-
 // ── ByYearChart — stacked horizontal bar (work + completed) ───────
 //   stacked ดีเพราะแสดงทั้ง total และ breakdown ในแถวเดียว
 //   ใช้ sky-500 (work = active สีฟ้า) + emerald-500 (completed = done สีเขียว)
@@ -477,43 +457,6 @@ function ByYearChart({ data }: { data: LandingStats['by_year'] }) {
           <span className="inline-block h-2.5 w-3 rounded-sm bg-emerald-500" />
           เสร็จสิ้น
         </span>
-      </div>
-    </div>
-  );
-}
-
-// ── ProportionBar — horizontal bar แบบ proportion (เปอร์เซ็นต์)
-//   ใช้ร่วมกันระหว่าง ByCategoryChart และ BySkillChart
-//   colorClass มาจาก caller (กำหนดสีจาก RAINBOW_PALETTE ตาม index)
-function ProportionBar({
-  label,
-  count,
-  total,
-  max,
-  colorClass,
-}: {
-  label: string;
-  count: number;
-  total: number;
-  max: number;
-  colorClass: string;
-}) {
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  const barPct = (count / max) * 100;
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="truncate font-medium text-gray-700">{label}</span>
-        <span className="ml-2 shrink-0 tabular-nums text-gray-600">
-          {formatNumber(count)}
-          <span className="ml-1 text-gray-400">({pct.toFixed(1)}%)</span>
-        </span>
-      </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-gray-100">
-        <div
-          className={`h-full rounded-full ${colorClass}`}
-          style={{ width: `${barPct}%` }}
-        />
       </div>
     </div>
   );

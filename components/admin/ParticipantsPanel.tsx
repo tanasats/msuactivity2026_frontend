@@ -57,7 +57,8 @@ interface Summary {
   passed: number;
   failed: number;
   cancelled: number;      // CANCELLED_BY_USER + CANCELLED_BY_STAFF + REJECTED_BY_STAFF
-  total: number;
+  total: number;          // count ทุกแถวใน registrations (รวม cancelled — ไว้ใช้เปรียบเทียบ)
+  total_active: number;   // count เฉพาะ active = pending + registered + pending_eval + passed + failed + no_show — ตรงกับ counter "ที่นั่ง"
 }
 
 const ERROR_LABEL: Record<ErrorReason, string> = {
@@ -132,6 +133,10 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
           ),
         ]);
       const cancelled = cancelledArr.reduce((sum, r) => sum + r.data.total, 0);
+      // total_active = ผู้สมัครที่ยัง active (ไม่รวม cancelled) — ตรงกับ counter "ที่นั่ง"
+      //   = pending + registered + (attended + noshow)
+      //   (attended รวม pending_eval + passed + failed อยู่แล้ว ดังนั้นไม่ต้อง sum ซ้ำ)
+      const total_active = pending + registered + attended + noshow;
       setSummary({
         pending,
         registered,
@@ -141,6 +146,7 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
         failed: failedRes.data.total,
         cancelled,
         total: totalRes.data.total,
+        total_active,
       });
     } catch {
       /* non-fatal */
@@ -168,9 +174,11 @@ export function ParticipantsPanel({ activityId, manageable }: Props) {
         </Link>
       </div>
 
-      {/* Summary stats */}
+      {/* Summary stats — ทั้งหมด · รออนุมัติ · ลงทะเบียน · รอประเมิน · ผ่าน · ไม่ผ่าน · ยกเลิก
+          ทั้งหมด = นับเฉพาะที่ active (ไม่รวม cancelled) → ตรงกับ "ที่นั่ง" registered_count */}
       {summary && (
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+          <StatTile label="ทั้งหมด" value={summary.total_active} tone="indigo" />
           <StatTile label="รออนุมัติ" value={summary.pending} tone="amber" />
           <StatTile label="ลงทะเบียน" value={summary.registered} tone="blue" />
           <StatTile
@@ -427,7 +435,7 @@ function StatTile({
 }: {
   label: string;
   value: number;
-  tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'violet' | 'gray';
+  tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'violet' | 'gray' | 'indigo';
 }) {
   const toneClass = {
     amber: 'bg-amber-50 text-amber-800',
@@ -436,6 +444,7 @@ function StatTile({
     rose: 'bg-rose-50 text-rose-800',
     violet: 'bg-violet-50 text-violet-800',
     gray: 'bg-gray-100 text-gray-700',
+    indigo: 'bg-indigo-100 text-indigo-800',
   }[tone];
   return (
     <div className={`rounded-lg px-3 py-2 ${toneClass}`}>

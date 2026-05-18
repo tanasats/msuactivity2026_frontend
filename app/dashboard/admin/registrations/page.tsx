@@ -23,6 +23,7 @@ import { useAuthStore } from '@/lib/store';
 import { CancelRegistrationDialog } from '@/components/admin/CancelRegistrationDialog';
 import { CancelCheckInDialog } from '@/components/admin/CancelCheckInDialog';
 import { RegistrationAuditDialog } from '@/components/admin/RegistrationAuditDialog';
+import { RevertEvalDialog } from '@/components/admin/RevertEvalDialog';
 import type {
   AdminRegistrationRow,
   EvaluationStatus,
@@ -74,12 +75,15 @@ export default function AdminRegistrationsPage() {
   // cancel check-in (super_admin only)
   const [pendingCancelCheckIn, setPendingCancelCheckIn] =
     useState<AdminRegistrationRow | null>(null);
+  // revert evaluation (super_admin only)
+  const [pendingRevertEval, setPendingRevertEval] =
+    useState<AdminRegistrationRow | null>(null);
   const isSuperAdmin = useAuthStore((s) => s.user?.role) === 'super_admin';
 
+  // cancel เฉพาะ status ที่ไม่มี side effects (ATTENDED ต้องผ่าน chain)
   const ADMIN_CANCELABLE_STATUSES = new Set<RegistrationStatus>([
     'PENDING_APPROVAL',
     'REGISTERED',
-    'ATTENDED',
   ]);
 
   const [faculties, setFaculties] = useState<MasterFaculty[]>([]);
@@ -464,6 +468,20 @@ export default function AdminRegistrationsPage() {
                           </button>
                           {isSuperAdmin &&
                             r.registration_status === 'ATTENDED' &&
+                            (r.evaluation_status === 'PASSED' ||
+                              r.evaluation_status === 'FAILED') && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingRevertEval(r)}
+                                className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50"
+                                title="ยกเลิกผลประเมิน (กลับเป็น 'รอประเมิน')"
+                              >
+                                <Ban className="h-3 w-3" aria-hidden />
+                                ยกเลิกผลประเมิน
+                              </button>
+                            )}
+                          {isSuperAdmin &&
+                            r.registration_status === 'ATTENDED' &&
                             (r.evaluation_status === null ||
                               r.evaluation_status === 'PENDING_EVALUATION') && (
                               <button
@@ -476,17 +494,20 @@ export default function AdminRegistrationsPage() {
                                 ยกเลิกเช็คอิน
                               </button>
                             )}
-                          {ADMIN_CANCELABLE_STATUSES.has(r.registration_status) && (
-                            <button
-                              type="button"
-                              onClick={() => setPendingCancel(r)}
-                              className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
-                              title="ยกเลิกการลงทะเบียน"
-                            >
-                              <Ban className="h-3 w-3" aria-hidden />
-                              ยกเลิก
-                            </button>
-                          )}
+                          {isSuperAdmin &&
+                            ADMIN_CANCELABLE_STATUSES.has(
+                              r.registration_status,
+                            ) && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingCancel(r)}
+                                className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                                title="ยกเลิกการลงทะเบียน"
+                              >
+                                <Ban className="h-3 w-3" aria-hidden />
+                                ยกเลิก
+                              </button>
+                            )}
                         </div>
                       </td>
                     </tr>
@@ -541,6 +562,23 @@ export default function AdminRegistrationsPage() {
         onClose={() => setPendingCancelCheckIn(null)}
         onCancelled={async () => {
           setPendingCancelCheckIn(null);
+          await load();
+        }}
+      />
+
+      <RevertEvalDialog
+        open={!!pendingRevertEval}
+        registrationId={pendingRevertEval?.registration_id ?? null}
+        studentName={pendingRevertEval?.student_name ?? ''}
+        previousResult={
+          pendingRevertEval?.evaluation_status === 'PASSED' ||
+          pendingRevertEval?.evaluation_status === 'FAILED'
+            ? pendingRevertEval.evaluation_status
+            : null
+        }
+        onClose={() => setPendingRevertEval(null)}
+        onReverted={async () => {
+          setPendingRevertEval(null);
           await load();
         }}
       />
