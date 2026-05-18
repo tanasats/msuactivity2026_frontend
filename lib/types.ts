@@ -694,6 +694,39 @@ export interface StudentStats {
   activities_count: number;
 }
 
+// StudentAggregateStats — รวมหลายมิติ (ใช้ใน student dashboard redesign)
+//   shape เดียวกับ AdminStudentAggregateStats (reuse backend model)
+export interface StudentAggregateStats {
+  overall: {
+    hours_total: number;
+    loan_hours_total: number;
+    passed_count: number;
+    failed_count: number;
+    pending_eval_count: number;
+    active_count: number;
+  };
+  by_year: {
+    academic_year: number;
+    hours: number;
+    loan_hours: number;
+    passed_count: number;
+  }[];
+  by_category: {
+    category_id: number;
+    category_code: number;
+    category_name: string;
+    hours: number;
+    passed_count: number;
+  }[];
+  by_skill: {
+    skill_id: number;
+    skill_code: string;
+    skill_name: string;
+    count: number;
+    hours: number;
+  }[];
+}
+
 export type BulkAddErrorReason =
   | 'NOT_FOUND'
   | 'NOT_STUDENT'

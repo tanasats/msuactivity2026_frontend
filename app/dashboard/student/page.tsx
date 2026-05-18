@@ -6,13 +6,12 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  Trophy,
   Gem,
-  Globe2,
-  HelpCircle,
   ImagePlus,
-  ListChecks,
+  Mail,
   MapPin,
+  TrendingUp,
+  Trophy,
   Trash2,
   X,
 } from 'lucide-react';
@@ -22,6 +21,12 @@ import { toast } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/lib/store';
 import {
+  CHART_CARD,
+  ChartHeader,
+  ProportionBar,
+  RAINBOW_PALETTE,
+} from '@/components/charts/proportion-chart';
+import {
   formatActivityRange,
   formatNumber,
 } from '@/lib/format';
@@ -29,8 +34,8 @@ import { PARTICIPANT_ROLE_LABEL } from '@/lib/participant-role';
 import type {
   EvaluationStatus,
   RegistrationPhoto,
+  StudentAggregateStats,
   StudentRegistration,
-  StudentStats,
 } from '@/lib/types';
 
 const MAX_PHOTOS_PER_REG = 5;
@@ -51,58 +56,52 @@ export default function StudentDashboardPage() {
   const user = useAuthStore((s) => s.user);
 
   const [items, setItems] = useState<StudentRegistration[] | null>(null);
-  const [stats, setStats] = useState<StudentStats | null>(null);
-  // overview = ทุกปีการศึกษารวมกัน (ไม่ขึ้นกับ year filter ที่เลือก)
-  const [overviewStats, setOverviewStats] = useState<StudentStats | null>(null);
+  // aggregate = สถิติทุกปีรวม + charts (by_year / by_category / by_skill)
+  //   ไม่ขึ้นกับ academicYear filter — โหลดครั้งเดียวพอ
+  const [aggregate, setAggregate] = useState<StudentAggregateStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingCancel, setPendingCancel] =
     useState<StudentRegistration | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
   // ปีการศึกษาที่กำลังเลือก (BE) — null ระหว่างโหลด default = current จาก backend
+  //   หมายเหตุ: year selector ตอนนี้กรองแค่ Active/History list — ไม่กระทบสถิติบนสุด
   const [academicYear, setAcademicYear] = useState<number | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
 
-  async function load(year: number) {
+  async function loadRegistrations(year: number) {
     setError(null);
     try {
-      const yearParam = `academic_year=${year}`;
-      // ดึง 3 endpoint พร้อมกัน — registrations + stats ปีที่เลือก + overview ทุกปี
-      // (ภาระ DB เพิ่มไม่มาก เพราะ aggregate ใช้ index user_id อยู่แล้ว)
-      const [regsRes, yearStatsRes, overviewStatsRes] = await Promise.all([
-        api.get<{ items: StudentRegistration[] }>(
-          `/api/student/registrations?${yearParam}`,
-        ),
-        api.get<StudentStats>(`/api/student/stats?${yearParam}`),
-        api.get<StudentStats>(`/api/student/stats`), // ไม่ส่ง academic_year = ทุกปี
-      ]);
-      setItems(regsRes.data.items);
-      setStats(yearStatsRes.data);
-      setOverviewStats(overviewStatsRes.data);
+      const res = await api.get<{ items: StudentRegistration[] }>(
+        `/api/student/registrations?academic_year=${year}`,
+      );
+      setItems(res.data.items);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setError(err.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
     }
   }
 
-  // โหลด academic-years ครั้งเดียวตอน mount → set default = current
+  // โหลด academic-years + aggregate stats ครั้งเดียวตอน mount
   useEffect(() => {
     if (!user || user.role !== 'student') return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get<AcademicYearsResponse>(
-          '/api/student/academic-years',
-        );
+        const [yearsRes, aggRes] = await Promise.all([
+          api.get<AcademicYearsResponse>('/api/student/academic-years'),
+          api.get<StudentAggregateStats>('/api/student/aggregate-stats'),
+        ]);
         if (cancelled) return;
-        setAvailableYears(res.data.available);
+        setAvailableYears(yearsRes.data.available);
+        setAggregate(aggRes.data);
         // ใช้ default_year (max ของปีที่นิสิตมี registration) แทน current ตรงๆ
         // — กันเคสนิสิตสมัครกิจกรรมในปีถัดไป แต่ default ปีปัจจุบันแล้วเห็น empty
-        setAcademicYear(res.data.default_year ?? res.data.current);
+        setAcademicYear(yearsRes.data.default_year ?? yearsRes.data.current);
       } catch (e: unknown) {
         if (cancelled) return;
         const err = e as { response?: { data?: { message?: string } } };
-        setError(err.response?.data?.message ?? 'โหลดข้อมูลปีการศึกษาไม่สำเร็จ');
+        setError(err.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
       }
     })();
     return () => {
@@ -110,10 +109,10 @@ export default function StudentDashboardPage() {
     };
   }, [user]);
 
-  // reload stats + registrations ทุกครั้งที่ academicYear เปลี่ยน
+  // reload registrations ทุกครั้งที่ academicYear เปลี่ยน
   useEffect(() => {
     if (!user || user.role !== 'student' || academicYear === null) return;
-    load(academicYear);
+    loadRegistrations(academicYear);
   }, [user, academicYear]);
 
   async function executeCancel() {
@@ -125,7 +124,16 @@ export default function StudentDashboardPage() {
       );
       setPendingCancel(null);
       toast.success('ยกเลิกการสมัครเรียบร้อย');
-      if (academicYear !== null) await load(academicYear);
+      // reload ทั้ง registrations และ aggregate (สถิติเปลี่ยน)
+      if (academicYear !== null) await loadRegistrations(academicYear);
+      try {
+        const aggRes = await api.get<StudentAggregateStats>(
+          '/api/student/aggregate-stats',
+        );
+        setAggregate(aggRes.data);
+      } catch {
+        /* ignore — sub-load */
+      }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setPendingCancel(null);
@@ -144,22 +152,212 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="mx-auto max-w-full p-6 md:p-8">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      {/* Profile header — แสดงข้อมูลตัวนิสิตจาก auth store (ไม่ต้อง fetch เพิ่ม) */}
+      {user && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-wrap items-start gap-4">
+            {user.picture_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.picture_url}
+                alt={user.full_name}
+                width={64}
+                height={64}
+                className="h-16 w-16 shrink-0 rounded-full border border-gray-200 bg-gray-100"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-200 text-2xl font-bold text-gray-500">
+                {user.full_name.charAt(0)}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-bold text-gray-900">
+                {user.full_name}
+              </h1>
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
+                <Mail className="h-3.5 w-3.5" aria-hidden />
+                {user.email}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-600">
+                {user.msu_id && (
+                  <span className="font-mono">{user.msu_id}</span>
+                )}
+                {user.faculty_name && (
+                  <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
+                    {user.faculty_name}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 flex items-center justify-between rounded-lg bg-rose-50 p-4 text-sm text-rose-700">
+          <span>{error}</span>
+          <button
+            onClick={() => academicYear !== null && loadRegistrations(academicYear)}
+            className="text-xs underline hover:no-underline"
+          >
+            ลองใหม่
+          </button>
+        </div>
+      )}
+
+      {/* 4-tile aggregate stats — ทุกปีรวม (ไม่ขึ้นกับ year selector ด้านล่าง) */}
+      <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile
+          icon={<Trophy className="h-5 w-5" aria-hidden />}
+          label="ชั่วโมงกิจกรรม"
+          value={aggregate ? formatNumber(aggregate.overall.hours_total) : '–'}
+          unit="ชม."
+          tone="blue"
+        />
+        <StatTile
+          icon={<Gem className="h-5 w-5" aria-hidden />}
+          label="ชั่วโมง กยศ"
+          value={
+            aggregate ? formatNumber(aggregate.overall.loan_hours_total) : '–'
+          }
+          unit="ชม."
+          tone="amber"
+        />
+        <StatTile
+          icon={<CheckCircle2 className="h-5 w-5" aria-hidden />}
+          label="ผ่านเกณฑ์"
+          value={aggregate ? formatNumber(aggregate.overall.passed_count) : '–'}
+          unit="ครั้ง"
+          tone="emerald"
+        />
+        <StatTile
+          icon={<TrendingUp className="h-5 w-5" aria-hidden />}
+          label="ลงทะเบียนรวม"
+          value={aggregate ? formatNumber(aggregate.overall.active_count) : '–'}
+          unit="ครั้ง"
+          tone="violet"
+          hint={
+            aggregate &&
+            aggregate.overall.failed_count +
+              aggregate.overall.pending_eval_count >
+              0
+              ? `ไม่ผ่าน ${aggregate.overall.failed_count} · รอประเมิน ${aggregate.overall.pending_eval_count}`
+              : undefined
+          }
+        />
+      </section>
+
+      {/* Charts — by year / by category / by skill (rainbow palette เหมือน admin student detail) */}
+      <section className="mt-5 grid gap-5 lg:grid-cols-3">
+        <div className={CHART_CARD}>
+          <ChartHeader title="ชั่วโมงต่อปีการศึกษา" />
+          {!aggregate ? (
+            <ChartSkeleton />
+          ) : aggregate.by_year.length === 0 ? (
+            <p className="text-xs text-gray-400">ยังไม่มีข้อมูล</p>
+          ) : (
+            <div className="space-y-3">
+              {aggregate.by_year.map((y) => {
+                const max = Math.max(
+                  1,
+                  ...aggregate.by_year.map((x) => Number(x.hours)),
+                );
+                return (
+                  <ProportionBar
+                    key={y.academic_year}
+                    label={`ปี ${y.academic_year}`}
+                    count={Number(y.hours)}
+                    total={0}
+                    max={max}
+                    colorClass="bg-sky-400"
+                    countSuffix="ชม."
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className={CHART_CARD}>
+          <ChartHeader title="ชั่วโมงตามหมวด" />
+          {!aggregate ? (
+            <ChartSkeleton />
+          ) : aggregate.by_category.every((c) => c.passed_count === 0) ? (
+            <p className="text-xs text-gray-400">ยังไม่มีข้อมูล</p>
+          ) : (
+            <div className="space-y-3">
+              {[...aggregate.by_category]
+                .sort((a, b) => Number(b.hours) - Number(a.hours))
+                .map((c, i) => {
+                  const max = Math.max(
+                    1,
+                    ...aggregate.by_category.map((x) => Number(x.hours)),
+                  );
+                  return (
+                    <ProportionBar
+                      key={c.category_id}
+                      label={c.category_name}
+                      count={Number(c.hours)}
+                      total={0}
+                      max={max}
+                      colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
+                      countSuffix="ชม."
+                    />
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        <div className={CHART_CARD}>
+          <ChartHeader
+            title="ทักษะที่ได้รับ"
+            subtitle="rollup ระดับแม่ — รวมทุกปี"
+          />
+          {!aggregate ? (
+            <ChartSkeleton />
+          ) : aggregate.by_skill.every((s) => s.count === 0) ? (
+            <p className="text-xs text-gray-400">ยังไม่มีทักษะที่ได้รับ</p>
+          ) : (
+            <div className="space-y-3">
+              {[...aggregate.by_skill]
+                .sort((a, b) => b.count - a.count)
+                .map((s, i) => {
+                  const max = Math.max(
+                    1,
+                    ...aggregate.by_skill.map((x) => x.count),
+                  );
+                  return (
+                    <ProportionBar
+                      key={s.skill_id}
+                      label={`${s.skill_code} · ${s.skill_name}`}
+                      count={s.count}
+                      total={0}
+                      max={max}
+                      colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
+                      countSuffix="กิจกรรม"
+                    />
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Year selector — กรองเฉพาะ Active/History list ด้านล่าง (สถิติด้านบนคือทุกปีรวม) */}
+      <div className="mt-8 mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="mb-1 text-2xl font-bold text-gray-900">
-            แผงควบคุม - Dashboard
-          </h1>
-          <p className="text-sm text-gray-500">
-            สรุปการเข้าร่วมกิจกรรม + กิจกรรมที่สมัครไว้และผ่านมาแล้ว
+          <h2 className="text-base font-semibold text-gray-900">
+            กิจกรรมที่สมัครและประวัติ
+          </h2>
+          <p className="text-xs text-gray-500">
+            กรองตามปีการศึกษาที่เลือก
             {academicYear !== null && (
-              <span className="ml-1.5 text-gray-400">
-                · ปีการศึกษา {academicYear}
-              </span>
+              <span className="ml-1 text-gray-400">· ปี {academicYear}</span>
             )}
           </p>
         </div>
-
-        {/* Academic year selector — default = current; เปลี่ยนแล้ว stats + registrations reload อัตโนมัติ */}
         <label className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm">
           <Calendar className="h-4 w-4 text-gray-400" aria-hidden />
           <span className="text-gray-600">ปีการศึกษา</span>
@@ -182,88 +380,11 @@ export default function StudentDashboardPage() {
         </label>
       </div>
 
-      {error && (
-        <div className="mb-4 flex items-center justify-between rounded-lg bg-rose-50 p-4 text-sm text-rose-700">
-          <span>{error}</span>
-          <button
-            onClick={() => academicYear !== null && load(academicYear)}
-            className="text-xs underline hover:no-underline"
-          >
-            ลองใหม่
-          </button>
-        </div>
-      )}
-
-      {/* Stats — แบ่ง 2 ระดับ:
-            1) ภาพรวม (ทุกปีการศึกษารวม) — สะสมตลอดอายุการศึกษา
-            2) ปีการศึกษาที่เลือก (default = ปัจจุบัน) — สำหรับติดตามเป้าปีนั้น */}
-      <section className="mb-4">
-        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-          <Globe2 className="h-4 w-4 text-blue-600" aria-hidden />
-          ภาพรวม
-          <span className="font-normal text-gray-400">(ทุกปีการศึกษา)</span>
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <StatCard
-            icon={<Trophy className="h-5 w-5" aria-hidden />}
-            label="ชั่วโมงกิจกรรม"
-            value={overviewStats ? formatNumber(overviewStats.hours_total) : null}
-            unit="ชั่วโมง"
-          />
-          <StatCard
-            icon={<Gem className="h-5 w-5" aria-hidden />}
-            label="ชั่วโมงจิตอาสา(กยศ)"
-            value={overviewStats ? formatNumber(overviewStats.loan_hours_total) : null}
-            unit="ชั่วโมง"
-            tone="amber"
-          />
-          <StatCard
-            icon={<ListChecks className="h-5 w-5" aria-hidden />}
-            label="กิจกรรมที่เข้าร่วม"
-            value={overviewStats ? formatNumber(overviewStats.activities_count) : null}
-            unit="กิจกรรม"
-            tone="emerald"
-          />
-        </div>
-      </section>
-
-      <section className="mb-8">
-        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-          <Calendar className="h-4 w-4 text-violet-600" aria-hidden />
-          ปีการศึกษา{' '}
-          <span className="text-violet-700">
-            {academicYear ?? '—'}
-          </span>
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <StatCard
-            icon={<Trophy className="h-5 w-5" aria-hidden />}
-            label="ชั่วโมงกิจกรรม"
-            value={stats ? formatNumber(stats.hours_total) : null}
-            unit="ชั่วโมง"
-          />
-          <StatCard
-            icon={<Gem className="h-5 w-5" aria-hidden />}
-            label="ชั่วโมงจิตอาสา(กยศ)"
-            value={stats ? formatNumber(stats.loan_hours_total) : null}
-            unit="ชั่วโมง"
-            tone="amber"
-          />
-          <StatCard
-            icon={<ListChecks className="h-5 w-5" aria-hidden />}
-            label="กิจกรรมที่เข้าร่วม"
-            value={stats ? formatNumber(stats.activities_count) : null}
-            unit="กิจกรรม"
-            tone="emerald"
-          />
-        </div>
-      </section>
-
       {/* Active section: PENDING + REGISTERED */}
       <section className="mb-10">
-        <h2 className="mb-3 text-base font-semibold text-gray-900">
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">
           กิจกรรมที่สมัครไว้
-        </h2>
+        </h3>
         {!items && !error && <CardListSkeleton />}
         {activeItems && activeItems.length === 0 && (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
@@ -291,9 +412,9 @@ export default function StudentDashboardPage() {
 
       {/* History section: ATTENDED + NO_SHOW */}
       <section>
-        <h2 className="mb-3 text-base font-semibold text-gray-900">
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">
           ประวัติการเข้าร่วม
-        </h2>
+        </h3>
         {!items && !error && <CardListSkeleton />}
         {historyItems && historyItems.length === 0 && (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
@@ -330,44 +451,57 @@ export default function StudentDashboardPage() {
   );
 }
 
-// ── stats card ────────────────────────────────────────────────────
-function StatCard({
+// ── stat tile (4-tile aggregate) — สไตล์เดียวกับ admin student detail ──
+function StatTile({
   icon,
   label,
   value,
   unit,
-  tone = 'blue',
+  tone,
+  hint,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string | null;
+  value: string;
   unit: string;
-  tone?: 'blue' | 'emerald' | 'amber';
+  tone: 'blue' | 'emerald' | 'amber' | 'violet';
+  hint?: string;
 }) {
-  const toneClass =
-    tone === 'emerald'
-      ? 'bg-emerald-100 text-emerald-700'
-      : tone === 'amber'
-        ? 'bg-amber-100 text-amber-700'
-        : 'bg-blue-100 text-blue-700';
+  const toneClass = {
+    blue: 'bg-blue-100 text-blue-700',
+    emerald: 'bg-emerald-100 text-emerald-700',
+    amber: 'bg-amber-100 text-amber-700',
+    violet: 'bg-violet-100 text-violet-700',
+  }[tone];
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${toneClass}`}
         >
           {icon}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <p className="text-xs text-gray-500">{label}</p>
           <p className="mt-0.5 text-xl font-bold text-gray-900">
-            {value === null ? '–' : value}
+            {value}
             <span className="ml-1 text-xs font-normal text-gray-500">
               {unit}
             </span>
           </p>
+          {hint && <p className="mt-0.5 text-[10px] text-gray-400">{hint}</p>}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="space-y-2">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-6 animate-pulse rounded-md bg-gray-100" />
+      ))}
     </div>
   );
 }
