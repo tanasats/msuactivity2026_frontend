@@ -33,6 +33,8 @@ const STATUS_LABEL: Record<ActivityStatus, { th: string; tone: string }> = {
   PENDING_APPROVAL: { th: 'รออนุมัติ', tone: 'bg-amber-100 text-amber-800' },
   WORK: { th: 'ดำเนินการ', tone: 'bg-emerald-100 text-emerald-800' },
   COMPLETED: { th: 'เสร็จสิ้น', tone: 'bg-slate-200 text-slate-800' },
+  // public page จะไม่เจอ DELETED จริง (backend ตัดออกแล้ว) — ใส่กัน type check
+  DELETED: { th: 'ถูกลบ', tone: 'bg-rose-100 text-rose-800' },
 };
 
 export default function ActivityDetailPage() {

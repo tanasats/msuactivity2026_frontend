@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
+  AlertTriangle,
   Calendar,
   CheckCircle2,
   Clock,
@@ -12,8 +13,10 @@ import {
   Loader2,
   MapPin,
   PencilLine,
+  RotateCcw,
   Search,
   ShieldCheck,
+  Trash2,
   UserCog,
   Users,
   X,
@@ -30,6 +33,7 @@ import { formatActivityRange, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/lib/store';
 import type {
   ActivityAuditEntry,
+  ActivityDeleteImpact,
   ActivityStatus,
   AdminActivityDetail,
   AdminUserSummary,
@@ -41,6 +45,7 @@ const STATUS_LABEL: Record<ActivityStatus, string> = {
   PENDING_APPROVAL: 'รออนุมัติ',
   WORK: 'ดำเนินการ',
   COMPLETED: 'เสร็จสิ้น',
+  DELETED: 'ถูกลบ',
 };
 
 export default function AdminActivityDetailPage() {
@@ -60,6 +65,12 @@ export default function AdminActivityDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
   const [busy, setBusy] = useState(false);
+  // soft-delete / restore (super_admin only)
+  const [showDelete, setShowDelete] = useState(false);
+  const [showRestore, setShowRestore] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<ActivityDeleteImpact | null>(null);
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
 
   async function load() {
     if (!id) return;
@@ -157,6 +168,61 @@ export default function AdminActivityDetailPage() {
     }
   }
 
+  // เปิด dialog ลบ — load impact preview จาก backend ก่อนแสดง warning
+  async function openDeleteDialog() {
+    if (!id) return;
+    setShowDelete(true);
+    setDeleteImpact(null);
+    setDeleteImpactLoading(true);
+    try {
+      const res = await api.get<ActivityDeleteImpact>(
+        `/api/admin/activities/${id}/delete-impact`,
+      );
+      setDeleteImpact(res.data);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'โหลดข้อมูลผลกระทบไม่สำเร็จ');
+    } finally {
+      setDeleteImpactLoading(false);
+    }
+  }
+
+  async function executeDelete() {
+    if (!id) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/activities/${id}/soft-delete`, {
+        reason: deleteReason.trim() || undefined,
+      });
+      toast.success('ลบกิจกรรมแล้ว — สามารถกู้คืนได้ภายหลัง');
+      setShowDelete(false);
+      setDeleteReason('');
+      setDeleteImpact(null);
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'ลบไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function executeRestore() {
+    if (!id) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/activities/${id}/restore`);
+      toast.success('กู้คืนกิจกรรมแล้ว');
+      setShowRestore(false);
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message ?? 'กู้คืนไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function executeReject() {
     if (!id) return;
     if (!rejectReason.trim()) {
@@ -205,6 +271,7 @@ export default function AdminActivityDetailPage() {
   }
 
   const isPending = activity.status === 'PENDING_APPROVAL';
+  const isDeleted = activity.status === 'DELETED';
 
   return (
     <div className="mx-auto max-w-full p-6 md:p-8">
@@ -214,6 +281,51 @@ export default function AdminActivityDetailPage() {
       >
         ← กลับรายการกิจกรรม
       </Link>
+
+      {/* Soft-delete banner — โชว์เมื่อ status=DELETED + ปุ่มกู้คืนสำหรับ super_admin */}
+      {isDeleted && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+          <div className="flex items-start gap-2.5">
+            <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" aria-hidden />
+            <div>
+              <p className="text-sm font-semibold text-rose-900">
+                กิจกรรมนี้ถูกลบแล้ว
+              </p>
+              <p className="mt-0.5 text-xs text-rose-700">
+                {activity.deleted_at && (
+                  <>
+                    เมื่อ{' '}
+                    {new Date(activity.deleted_at).toLocaleString('th-TH')}
+                  </>
+                )}
+                {activity.deleted_by_name && (
+                  <> · โดย {activity.deleted_by_name}</>
+                )}
+                {activity.previous_status && (
+                  <>
+                    {' '}· สถานะก่อนลบ{' '}
+                    <strong>{STATUS_LABEL[activity.previous_status]}</strong>
+                  </>
+                )}
+              </p>
+              <p className="mt-1 text-xs text-rose-600">
+                การเขียนทั้งหมด (สมัคร, เช็คอิน, ประเมิน, แก้ไข) ถูกระงับจนกว่าจะกู้คืน
+              </p>
+            </div>
+          </div>
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowRestore(true)}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden />
+              กู้คืนกิจกรรม
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Header card */}
       <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
@@ -259,9 +371,10 @@ export default function AdminActivityDetailPage() {
         </p>
 
         {/* action buttons — approve/reject (PENDING) + แก้ไข (any) + ประวัติ (any)
-            + super_admin override "เปลี่ยนสถานะ" — เห็นได้ทุกสถานะ */}
+            + super_admin override "เปลี่ยนสถานะ" — เห็นได้ทุกสถานะ
+            ถ้า status=DELETED ปุ่มเขียนทั้งหมดถูกซ่อน — โชว์เฉพาะ "ประวัติ" + restore ใน banner */}
         <div className="mt-4 flex flex-wrap gap-2">
-          {(isPending || isSuperAdmin) && (
+          {!isDeleted && (isPending || isSuperAdmin) && (
             <>
             {isPending && (
               <>
@@ -302,16 +415,18 @@ export default function AdminActivityDetailPage() {
             )}
             </>
           )}
-          {/* admin/super_admin: แก้ไข + ดูประวัติ — เห็นทุกสถานะ */}
-          <button
-            type="button"
-            onClick={() => setShowEdit(true)}
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-          >
-            <PencilLine className="h-4 w-4" aria-hidden />
-            แก้ไข
-          </button>
+          {/* admin/super_admin: แก้ไข — ซ่อนเมื่อ DELETED (จะ block อยู่แล้วที่ backend) */}
+          {!isDeleted && (
+            <button
+              type="button"
+              onClick={() => setShowEdit(true)}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+            >
+              <PencilLine className="h-4 w-4" aria-hidden />
+              แก้ไข
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowAudit(true)}
@@ -321,6 +436,19 @@ export default function AdminActivityDetailPage() {
             <History className="h-4 w-4" aria-hidden />
             ประวัติ
           </button>
+          {/* ลบกิจกรรม — super_admin only, เฉพาะกรณียังไม่ DELETED */}
+          {isSuperAdmin && !isDeleted && (
+            <button
+              type="button"
+              onClick={openDeleteDialog}
+              disabled={busy}
+              title="super_admin: soft-delete (กู้คืนได้)"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              ลบกิจกรรม
+            </button>
+          )}
         </div>
 
         {/* approval audit trail */}
@@ -572,11 +700,14 @@ export default function AdminActivityDetailPage() {
                   disabled={busy}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
                 >
-                  {(Object.keys(STATUS_LABEL) as ActivityStatus[]).map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABEL[s]} {s === activity.status ? '(ปัจจุบัน)' : ''}
-                    </option>
-                  ))}
+                  {/* ตัด DELETED ออก — ใช้ปุ่ม "ลบกิจกรรม" แทน (มี impact preview + audit ครบ) */}
+                  {(Object.keys(STATUS_LABEL) as ActivityStatus[])
+                    .filter((s) => s !== 'DELETED')
+                    .map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABEL[s]} {s === activity.status ? '(ปัจจุบัน)' : ''}
+                      </option>
+                    ))}
                 </select>
               </div>
               {(targetStatus === 'WORK' || targetStatus === 'COMPLETED') &&
@@ -630,6 +761,136 @@ export default function AdminActivityDetailPage() {
           onClose={() => setShowAudit(false)}
         />
       )}
+
+      {/* Soft-delete dialog — แสดง impact preview + reason (optional) */}
+      {showDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-gray-100 px-5 py-4">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                <Trash2 className="h-5 w-5 text-rose-600" aria-hidden />
+                ลบกิจกรรม?
+              </h2>
+              <p className="mt-1 text-xs text-gray-500">
+                soft-delete — กิจกรรมยังอยู่ใน DB และกู้คืนได้ภายหลัง
+              </p>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              {/* Impact preview */}
+              {deleteImpactLoading && (
+                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  กำลังคำนวณผลกระทบ...
+                </div>
+              )}
+              {deleteImpact && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-900">
+                    <AlertTriangle className="h-4 w-4" aria-hidden />
+                    ผลกระทบเมื่อลบ
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-amber-900">
+                    <li>
+                      กระทบนิสิตที่ลงทะเบียน:{' '}
+                      <strong>{formatNumber(deleteImpact.affected_students)}</strong> คน
+                    </li>
+                    <li>
+                      ชั่วโมงกิจกรรมที่จะถูกตัดจากสถิตินิสิต:{' '}
+                      <strong>{formatNumber(deleteImpact.hours_to_lose)}</strong> ชม.
+                      {deleteImpact.loan_hours_to_lose > 0 && (
+                        <> · กยศ <strong>{formatNumber(deleteImpact.loan_hours_to_lose)}</strong> ชม.</>
+                      )}
+                    </li>
+                    {(deleteImpact.by_evaluation.passed +
+                      deleteImpact.by_evaluation.failed +
+                      deleteImpact.by_evaluation.pending_evaluation) > 0 && (
+                      <li className="text-amber-800">
+                        ประเมินแล้ว: ผ่าน {deleteImpact.by_evaluation.passed} ·
+                        ไม่ผ่าน {deleteImpact.by_evaluation.failed} ·
+                        รอประเมิน {deleteImpact.by_evaluation.pending_evaluation}
+                      </li>
+                    )}
+                  </ul>
+                  <p className="mt-2 text-[11px] text-amber-700">
+                    หลังลบ: นิสิตจะไม่เห็นกิจกรรมนี้ใน dashboard ทั้งใน list, สถิติ, charts —
+                    กู้คืนได้เมื่อต้องการ
+                  </p>
+                </div>
+              )}
+
+              {/* Reason (optional) */}
+              <div>
+                <label
+                  htmlFor="delete-reason"
+                  className="mb-1 block text-sm font-medium text-gray-700"
+                >
+                  เหตุผล <span className="text-gray-400">(ไม่บังคับ)</span>
+                </label>
+                <textarea
+                  id="delete-reason"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  rows={2}
+                  maxLength={1000}
+                  disabled={busy}
+                  placeholder="เช่น สร้างผิด, ทดสอบ, ยกเลิกจริง"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                />
+                <p className="mt-1 text-right text-[11px] text-gray-400">
+                  {deleteReason.length}/1000
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDelete(false);
+                  setDeleteReason('');
+                  setDeleteImpact(null);
+                }}
+                disabled={busy}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={executeDelete}
+                disabled={busy || deleteImpactLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+                {busy ? 'กำลังลบ...' : 'ยืนยันลบ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore dialog — simple confirm */}
+      <ConfirmDialog
+        open={showRestore}
+        title="กู้คืนกิจกรรมนี้?"
+        message={
+          <>
+            กู้คืน <strong>{activity.title}</strong> กลับเป็นสถานะ{' '}
+            <strong>
+              {activity.previous_status
+                ? STATUS_LABEL[activity.previous_status]
+                : '—'}
+            </strong>
+            {' '}— นิสิตจะเห็นกิจกรรมและสถิติกลับมาตามเดิม
+          </>
+        }
+        confirmLabel="กู้คืน"
+        loading={busy}
+        onConfirm={executeRestore}
+        onCancel={() => setShowRestore(false)}
+      />
+
 
       {/* Reject dialog — ใส่เหตุผลก่อน confirm */}
       {showReject && (
@@ -1295,6 +1556,8 @@ const AUDIT_ACTION_LABEL: Record<ActivityAuditEntry['action'], { text: string; t
   bulk_approve_registration: { text: 'อนุมัติผู้สมัครหลายคน', tone: 'bg-emerald-50 text-emerald-700' },
   bulk_evaluate_registration: { text: 'ประเมินหลายคน', tone: 'bg-violet-50 text-violet-700' },
   change_participant_role: { text: 'เปลี่ยนสถานภาพในกิจกรรม', tone: 'bg-amber-50 text-amber-700' },
+  delete: { text: 'ลบกิจกรรม (soft)', tone: 'bg-rose-50 text-rose-700' },
+  restore: { text: 'กู้คืนกิจกรรม', tone: 'bg-emerald-50 text-emerald-700' },
 };
 
 function AuditDialog({

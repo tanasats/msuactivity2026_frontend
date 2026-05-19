@@ -5,7 +5,10 @@ import Link from 'next/link';
 import {
   Calendar,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
+  Download,
   Gem,
   ImagePlus,
   Mail,
@@ -17,6 +20,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '@/lib/api';
+import { downloadAuthed } from '@/lib/download';
 import { toast } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/lib/store';
@@ -64,17 +68,22 @@ export default function StudentDashboardPage() {
     useState<StudentRegistration | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  // ปีการศึกษาที่กำลังเลือก (BE) — null ระหว่างโหลด default = current จาก backend
+  // ปีการศึกษาที่กำลังเลือก:
+  //   null  = ยังโหลด default ไม่เสร็จ (initial only)
+  //   'all' = ทุกปีการศึกษา (ไม่ส่ง academic_year filter)
+  //   number = ปีเดียว
   //   หมายเหตุ: year selector ตอนนี้กรองแค่ Active/History list — ไม่กระทบสถิติบนสุด
-  const [academicYear, setAcademicYear] = useState<number | null>(null);
+  const [academicYear, setAcademicYear] = useState<number | 'all' | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
 
-  async function loadRegistrations(year: number) {
+  async function loadRegistrations(year: number | 'all') {
     setError(null);
     try {
-      const res = await api.get<{ items: StudentRegistration[] }>(
-        `/api/student/registrations?academic_year=${year}`,
-      );
+      const url =
+        year === 'all'
+          ? '/api/student/registrations'
+          : `/api/student/registrations?academic_year=${year}`;
+      const res = await api.get<{ items: StudentRegistration[] }>(url);
       setItems(res.data.items);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -190,6 +199,35 @@ export default function StudentDashboardPage() {
                 )}
               </div>
             </div>
+            {/* Export CSV — ใช้ filter ปีตามที่เลือก ('all' = ทุกปี → ไม่ส่ง academic_year) */}
+            <button
+              type="button"
+              onClick={() => {
+                const idLabel = user.msu_id || user.id;
+                const stamp = new Date().toISOString().slice(0, 10);
+                const specificYear =
+                  typeof academicYear === 'number' ? academicYear : null;
+                const url =
+                  specificYear !== null
+                    ? `/api/student/registrations.csv?academic_year=${specificYear}`
+                    : '/api/student/registrations.csv';
+                const yearSuffix = specificYear !== null ? `-${specificYear}` : '-all';
+                downloadAuthed(
+                  url,
+                  `my-activities-${idLabel}${yearSuffix}-${stamp}.csv`,
+                );
+              }}
+              title="ดาวน์โหลดข้อมูลกิจกรรมของฉัน (CSV)"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              CSV
+              {academicYear !== null && (
+                <span className="ml-1 text-xs text-gray-400">
+                  · {academicYear === 'all' ? 'ทุกปี' : `ปี ${academicYear}`}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       )}
@@ -354,7 +392,9 @@ export default function StudentDashboardPage() {
           <p className="text-xs text-gray-500">
             กรองตามปีการศึกษาที่เลือก
             {academicYear !== null && (
-              <span className="ml-1 text-gray-400">· ปี {academicYear}</span>
+              <span className="ml-1 text-gray-400">
+                · {academicYear === 'all' ? 'ทุกปี' : `ปี ${academicYear}`}
+              </span>
             )}
           </p>
         </div>
@@ -363,14 +403,20 @@ export default function StudentDashboardPage() {
           <span className="text-gray-600">ปีการศึกษา</span>
           <select
             value={academicYear ?? ''}
-            onChange={(e) => setAcademicYear(Number(e.target.value))}
-            disabled={availableYears.length === 0}
+            onChange={(e) => {
+              const v = e.target.value;
+              setAcademicYear(v === 'all' ? 'all' : Number(v));
+            }}
+            disabled={availableYears.length === 0 && academicYear === null}
             className="bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
             aria-label="เลือกปีการศึกษา"
           >
-            {availableYears.length === 0 && academicYear !== null && (
-              <option value={academicYear}>{academicYear}</option>
-            )}
+            <option value="all">ทุกปีการศึกษา</option>
+            {/* fallback: ปี default ที่ยังไม่อยู่ใน availableYears */}
+            {availableYears.length === 0 &&
+              typeof academicYear === 'number' && (
+                <option value={academicYear}>{academicYear}</option>
+              )}
             {availableYears.map((y) => (
               <option key={y} value={y}>
                 {y}
@@ -729,6 +775,8 @@ function PhotoSection({
     null,
   );
   const [deleting, setDeleting] = useState(false);
+  // collapse/expand — default: ยุบไว้ (ลด noise ในประวัติ — header แสดง count อยู่แล้ว)
+  const [expanded, setExpanded] = useState(false);
 
   const remaining = MAX_PHOTOS_PER_REG - photos.length;
   const canAddMore = remaining > 0;
@@ -795,14 +843,27 @@ function PhotoSection({
 
   return (
     <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-medium text-gray-700">
-          รูปภาพหลักฐานการเข้าร่วม{' '}
-          <span className="font-normal text-gray-400">
-            ({photos.length}/{MAX_PHOTOS_PER_REG} รูป)
+      <div className={`flex items-center justify-between ${expanded ? 'mb-2' : ''}`}>
+        {/* Toggle: คลิกที่ label/chevron เพื่อ ยุบ/ขยาย — ปุ่ม "เพิ่มรูป" แยกออกมา */}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="-m-1 flex items-center gap-1.5 rounded p-1 text-left text-xs font-medium text-gray-700 hover:bg-gray-100"
+        >
+          {expanded ? (
+            <ChevronUp className="h-3.5 w-3.5 text-gray-500" aria-hidden />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 text-gray-500" aria-hidden />
+          )}
+          <span>
+            รูปภาพหลักฐานการเข้าร่วม{' '}
+            <span className="font-normal text-gray-400">
+              ({photos.length}/{MAX_PHOTOS_PER_REG} รูป)
+            </span>
           </span>
-        </p>
-        {canAddMore && (
+        </button>
+        {expanded && canAddMore && (
           <>
             <button
               type="button"
@@ -825,43 +886,45 @@ function PhotoSection({
         )}
       </div>
 
-      {photos.length === 0 ? (
-        <p className="text-xs text-gray-400">
-          ยังไม่มีรูปภาพ — เพิ่มได้สูงสุด {MAX_PHOTOS_PER_REG} รูป (JPG/PNG/WebP, ≤ 5 MB)
-        </p>
-      ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-          {photos.map((p) => (
-            <div
-              key={p.id}
-              className="group relative aspect-square overflow-hidden rounded-md border border-gray-200 bg-white"
-            >
-              <a
-                href={p.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={p.filename}
+      {expanded && (
+        photos.length === 0 ? (
+          <p className="text-xs text-gray-400">
+            ยังไม่มีรูปภาพ — เพิ่มได้สูงสุด {MAX_PHOTOS_PER_REG} รูป (JPG/PNG/WebP, ≤ 5 MB)
+          </p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+            {photos.map((p) => (
+              <div
+                key={p.id}
+                className="group relative aspect-square overflow-hidden rounded-md border border-gray-200 bg-white"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.url}
-                  alt={p.filename}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              </a>
-              <button
-                type="button"
-                onClick={() => setPendingDelete(p)}
-                className="absolute right-1 top-1 hidden rounded-md bg-rose-600/90 p-1 text-white opacity-90 hover:bg-rose-700 group-hover:block"
-                aria-label="ลบรูป"
-                title="ลบรูป"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-        </div>
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={p.filename}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={p.url}
+                    alt={p.filename}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPendingDelete(p)}
+                  className="absolute right-1 top-1 hidden rounded-md bg-rose-600/90 p-1 text-white opacity-90 hover:bg-rose-700 group-hover:block"
+                  aria-label="ลบรูป"
+                  title="ลบรูป"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       <ConfirmDialog

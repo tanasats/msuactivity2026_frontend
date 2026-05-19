@@ -265,7 +265,9 @@ export type ActivityAuditAction =
   | 'bulk_add_registration'
   | 'bulk_approve_registration'
   | 'bulk_evaluate_registration'
-  | 'change_participant_role';
+  | 'change_participant_role'
+  | 'delete'
+  | 'restore';
 
 export interface ActivityAuditEntry {
   id: number;
@@ -431,7 +433,8 @@ export type ActivityStatus =
   | 'DRAFT'
   | 'PENDING_APPROVAL'
   | 'WORK'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'DELETED';
 
 export interface ActivitySummary {
   id: number;
@@ -595,11 +598,37 @@ export interface AdminActivityDetail extends AdminActivitySummary {
   approved_by: number | null;
   approved_by_name: string | null;
   published_at: string | null;
+  // soft-delete metadata — non-null เฉพาะตอน status='DELETED'
+  previous_status: ActivityStatus | null;
+  deleted_at: string | null;
+  deleted_by: number | null;
+  deleted_by_name: string | null;
   skills: ActivitySkillChip[];
   eligible_faculties: { id: number; code: string; name: string }[];
   poster: ActivityPoster | null;
   poster_url: string | null;
   documents: ActivityDocument[];
+}
+
+// payload จาก GET /api/admin/activities/:id/delete-impact
+//   ใช้แสดง warning ก่อนกด confirm ลบ
+export interface ActivityDeleteImpact {
+  activity: {
+    id: number;
+    title: string;
+    status: ActivityStatus;
+    hours: number;
+    loan_hours: number;
+  };
+  affected_students: number;       // PENDING/REGISTERED/ATTENDED/NO_SHOW รวม
+  hours_to_lose: number;           // นิสิตที่ PASSED * hours
+  loan_hours_to_lose: number;
+  by_evaluation: {
+    passed: number;
+    failed: number;
+    pending_evaluation: number;
+  };
+  by_registration_status: Partial<Record<RegistrationStatus, number>>;
 }
 
 export interface AdminStats {

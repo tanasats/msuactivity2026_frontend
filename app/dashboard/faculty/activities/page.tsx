@@ -266,7 +266,8 @@ function FacultyActivitiesPageInner() {
           aria-label="กรองสถานะ"
         >
           <option value="">ทุกสถานะ</option>
-          {STATUS_LIST.map((s) => (
+          {/* faculty ไม่เห็น DELETED — super_admin เท่านั้นที่ลบ/restore ได้ */}
+          {STATUS_LIST.filter((s) => s.value !== 'DELETED').map((s) => (
             <option key={s.value} value={s.value}>
               {s.label}
             </option>

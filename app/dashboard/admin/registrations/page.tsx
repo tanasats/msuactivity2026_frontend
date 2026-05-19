@@ -474,6 +474,11 @@ export default function AdminRegistrationsPage() {
                         >
                           <p className="font-medium text-gray-900 hover:text-indigo-700">
                             {r.activity_title}
+                            {r.activity_status === 'DELETED' && (
+                              <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+                                ถูกลบ
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-gray-500">
                             {r.activity_code && (

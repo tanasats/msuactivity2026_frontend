@@ -11,6 +11,7 @@ import {
   Filter,
   Plus,
   Search,
+  Trash2,
   X,
   XCircle,
 } from 'lucide-react';
@@ -497,6 +498,17 @@ function AdminActivitiesPageInner() {
           </select>
         </div>
       </div>
+
+      {/* Trash view banner — โชว์เมื่อ filter status=DELETED */}
+      {status === 'DELETED' && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            กำลังดูกิจกรรมที่ถูกลบ — คลิกเข้าไปในแต่ละกิจกรรมเพื่อ
+            <strong className="font-semibold">กู้คืน</strong> (super_admin only)
+          </span>
+        </div>
+      )}
 
       {/* Active filter chips + result info + sort + page-size */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
