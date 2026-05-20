@@ -7,13 +7,14 @@ import {
   Camera,
   CheckCircle2,
   Clipboard,
+  Clock,
   QrCode,
   XCircle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import type { FacultyActivityDetail } from '@/lib/types';
-import { formatActivityRange } from '@/lib/format';
+import { formatActivityRange, formatDateTime } from '@/lib/format';
 
 type Mode = 'camera' | 'manual';
 
@@ -102,7 +103,7 @@ export default function FacultyCheckInScanPage() {
         ← กลับหน้ากิจกรรม
       </Link>
 
-      <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+      <div className="mb-4 rounded-2xl bg-white p-6 shadow-sm">
         <div className="mb-2 flex items-center gap-2">
           <QrCode className="h-5 w-5 text-indigo-600" aria-hidden />
           <h1 className="text-xl font-bold text-gray-900">หน้าสแกน Check-in</h1>
@@ -118,15 +119,19 @@ export default function FacultyCheckInScanPage() {
             <p className="mt-1 text-xs text-gray-500">
               {activity.location} · {formatActivityRange(activity.start_at, activity.end_at)}
             </p>
-            {(activity.check_in_opens_at || activity.check_in_closes_at) && (
-              <p className="mt-1 text-xs text-gray-500">
-                ช่วงสแกน: {activity.check_in_opens_at ?? '—'} ถึง{' '}
-                {activity.check_in_closes_at ?? '—'}
-              </p>
-            )}
           </>
         )}
       </div>
+
+      {/* ช่วงสแกน — DB คอลัมน์ NOT NULL → ค่ามาเสมอ */}
+      {activity && (
+        <div className="mb-4">
+          <ScanWindowCard
+            opensAt={activity.check_in_opens_at}
+            closesAt={activity.check_in_closes_at}
+          />
+        </div>
+      )}
 
       {/* Mode toggle */}
       <div className="mb-4 inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
@@ -213,6 +218,41 @@ export default function FacultyCheckInScanPage() {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Scan window card ─────────────────────────────────────────────
+// แสดงเฉพาะวันเวลา เปิด-ปิด สแกน
+//   activities.check_in_opens_at / closes_at เป็น NOT NULL → ค่ามาเสมอ
+function ScanWindowCard({
+  opensAt,
+  closesAt,
+}: {
+  opensAt: string;
+  closesAt: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <Clock className="h-5 w-5 text-gray-600" aria-hidden />
+        <p className="text-sm font-semibold text-gray-900">ช่วงเวลาสแกน</p>
+      </div>
+      <div className="grid gap-2 text-sm sm:grid-cols-2">
+        <ScanWindowRow label="เปิดสแกน" iso={opensAt} />
+        <ScanWindowRow label="ปิดสแกน" iso={closesAt} />
+      </div>
+    </div>
+  );
+}
+
+function ScanWindowRow({ label, iso }: { label: string; iso: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="shrink-0 text-xs text-gray-500">{label}</span>
+      <span className="font-medium text-gray-900">
+        {formatDateTime(iso).replace(/, ?/, ' · ')}
+      </span>
     </div>
   );
 }

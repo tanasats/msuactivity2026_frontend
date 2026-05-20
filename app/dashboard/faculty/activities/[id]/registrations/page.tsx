@@ -939,11 +939,12 @@ export default function FacultyRegistrationsPage() {
           pendingCancel && (
             <>
               ยกเลิกการสมัครของ <strong>{pendingCancel.student_name}</strong> —
-              ที่นั่งจะถูกคืนกลับเข้า capacity
+              ที่นั่งจะถูกคืนกลับเข้ากิจกรรม
             </>
           )
         }
         confirmLabel="ยกเลิก"
+        cancelLabel="ไม่ยกเลิก"
         loading={busy}
         onConfirm={executeCancel}
         onCancel={() => setPendingCancel(null)}

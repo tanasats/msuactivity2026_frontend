@@ -100,6 +100,17 @@ function localInputToIso(local: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+// helper: shift local datetime-input string ด้วย minutes (+/-)
+//   คืน '' ถ้า parse ไม่ได้
+function shiftLocalInput(local: string, minutes: number): string {
+  if (!local) return '';
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) return '';
+  return isoToLocalInput(
+    new Date(d.getTime() + minutes * 60_000).toISOString(),
+  );
+}
+
 function initialPosterMeta(p: ActivityPoster | null): PosterMeta | null {
   if (!p) return null;
   return {
@@ -200,6 +211,23 @@ export function ActivityForm({
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // auto-fill check-in fields เมื่อ start_at/end_at เปลี่ยน
+  //   - ถ้า user แก้ check-in เอง → ตั้ง touched=true → หยุด auto-fill ฟิลด์นั้น
+  //   - edit mode: เริ่มต้น touched=true ถ้า DB มีค่าอยู่ (กันเขียนทับ)
+  const [checkInOpensTouched, setCheckInOpensTouched] = useState(
+    mode !== 'create' && !!initial?.check_in_opens_at,
+  );
+  const [checkInClosesTouched, setCheckInClosesTouched] = useState(
+    mode !== 'create' && !!initial?.check_in_closes_at,
+  );
+  // ค่า default จาก system_settings (อ่านจาก /api/public/check-in-defaults)
+  //   null ระหว่างโหลด — auto-fill จะรอจนกว่าจะได้ค่า
+  //   ถ้าโหลดล้มเหลว → cong ใช้ {30,15} เป็น fallback (ตรงกับ default ของ backend)
+  const [checkInDefaults, setCheckInDefaults] = useState<{
+    before: number;
+    after: number;
+  } | null>(null);
+
   // poster state — แยกจาก ActivityFormValue เพราะ upload เกิดก่อน save (ไม่อยู่ใน controlled fields)
   const [poster, setPoster] = useState<PosterMeta | null>(
     initialPosterMeta(initial?.poster ?? null),
@@ -289,6 +317,57 @@ export function ActivityForm({
       cancelled = true;
     };
   }, [value.academic_year]);
+
+  // โหลด default ช่วงเช็คอินจาก system_settings — ครั้งเดียวตอน mount
+  //   ถ้าโหลดไม่ได้ → ปล่อย null → auto-fill ฟิลด์เช็คอินจะไม่ทำงาน
+  //   (ผู้ใช้กรอกเองได้ หรือเว้นว่าง = backend คำนวณตอน scan)
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ before_minutes: number; after_minutes: number }>(
+        '/api/public/check-in-defaults',
+      )
+      .then((res) => {
+        if (cancelled) return;
+        setCheckInDefaults({
+          before: res.data.before_minutes,
+          after: res.data.after_minutes,
+        });
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        console.warn('[ActivityForm] โหลด check-in defaults ไม่สำเร็จ:', e?.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // auto-fill check_in_opens_at จาก start_at — เฉพาะตอน user ยังไม่แตะฟิลด์เอง
+  //   (รวมถึง mount แรกของ create mode ที่ start_at มีค่า default แต่ check_in ว่าง)
+  //   รอจนกว่า checkInDefaults จะโหลดเสร็จ (กัน hardcode ค่า default)
+  useEffect(() => {
+    if (checkInOpensTouched) return;
+    if (!checkInDefaults) return;
+    const next = value.start_at
+      ? shiftLocalInput(value.start_at, -checkInDefaults.before)
+      : '';
+    setValue((v) =>
+      v.check_in_opens_at === next ? v : { ...v, check_in_opens_at: next },
+    );
+  }, [value.start_at, checkInOpensTouched, checkInDefaults]);
+
+  // auto-fill check_in_closes_at จาก end_at
+  useEffect(() => {
+    if (checkInClosesTouched) return;
+    if (!checkInDefaults) return;
+    const next = value.end_at
+      ? shiftLocalInput(value.end_at, checkInDefaults.after)
+      : '';
+    setValue((v) =>
+      v.check_in_closes_at === next ? v : { ...v, check_in_closes_at: next },
+    );
+  }, [value.end_at, checkInClosesTouched, checkInDefaults]);
 
   function setField<K extends keyof ActivityFormValue>(
     key: K,
@@ -812,24 +891,43 @@ export function ActivityForm({
         <div className="grid gap-4 md:grid-cols-2">
           <Field
             label="ช่วงเปิดเช็คอิน — เริ่ม"
-            hint="ว่าง = 30 นาทีก่อนเริ่มกิจกรรม"
+            required
+            hint={
+              checkInDefaults
+                ? `auto-fill: ${checkInDefaults.before} นาทีก่อนเริ่มกิจกรรม (แก้ได้)`
+                : 'auto-fill: ตามที่ระบบกำหนด (แก้ได้)'
+            }
           >
             <input
               type="datetime-local"
               value={value.check_in_opens_at}
-              onChange={(e) => setField('check_in_opens_at', e.target.value)}
+              onChange={(e) => {
+                // user แก้เอง → หยุด auto-follow start_at
+                setCheckInOpensTouched(true);
+                setField('check_in_opens_at', e.target.value);
+              }}
               className={inputClass}
+              required
             />
           </Field>
           <Field
             label="ช่วงเปิดเช็คอิน — สิ้นสุด"
-            hint="ว่าง = 15 นาทีหลังจบกิจกรรม"
+            required
+            hint={
+              checkInDefaults
+                ? `auto-fill: ${checkInDefaults.after} นาทีหลังจบกิจกรรม (แก้ได้)`
+                : 'auto-fill: ตามที่ระบบกำหนด (แก้ได้)'
+            }
           >
             <input
               type="datetime-local"
               value={value.check_in_closes_at}
-              onChange={(e) => setField('check_in_closes_at', e.target.value)}
+              onChange={(e) => {
+                setCheckInClosesTouched(true);
+                setField('check_in_closes_at', e.target.value);
+              }}
               className={inputClass}
+              required
             />
           </Field>
         </div>

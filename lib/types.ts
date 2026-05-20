@@ -591,8 +591,8 @@ export interface AdminActivitySummary extends ActivitySummary {
 export interface AdminActivityDetail extends AdminActivitySummary {
   description: string;
   approval_mode: 'AUTO' | 'MANUAL';
-  check_in_opens_at: string | null;
-  check_in_closes_at: string | null;
+  check_in_opens_at: string;
+  check_in_closes_at: string;
   rejection_reason: string | null;
   approved_at: string | null;
   approved_by: number | null;
@@ -639,8 +639,8 @@ export interface AdminStats {
 export interface FacultyActivityDetail extends FacultyActivitySummary {
   description: string;
   approval_mode: 'AUTO' | 'MANUAL';
-  check_in_opens_at: string | null;
-  check_in_closes_at: string | null;
+  check_in_opens_at: string;
+  check_in_closes_at: string;
   rejection_reason: string | null;
   approved_at: string | null;
   approved_by: number | null;
@@ -709,8 +709,8 @@ export interface StudentRegistration {
   capacity: number;
   registered_count: number;
   activity_status: ActivityStatus;
-  check_in_opens_at: string | null;
-  check_in_closes_at: string | null;
+  check_in_opens_at: string;
+  check_in_closes_at: string;
   category_code: number;
   category_name: string;
   organization_code: string;

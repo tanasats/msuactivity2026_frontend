@@ -1227,7 +1227,7 @@ function AdminEditDialog({
     end_at: isoToLocal(activity.end_at),
     registration_open_at: isoToLocal(activity.registration_open_at),
     registration_close_at: isoToLocal(activity.registration_close_at),
-    // check-in window — nullable; '' = clear/ใช้ default
+    // check-in window — NOT NULL ทั้งคู่ (มีค่าเสมอ)
     check_in_opens_at: isoToLocal(activity.check_in_opens_at),
     check_in_closes_at: isoToLocal(activity.check_in_closes_at),
   });
@@ -1242,23 +1242,27 @@ function AdminEditDialog({
     if (Number(v.hours) !== Number(activity.hours)) out.hours = Number(v.hours);
     if (Number(v.loan_hours) !== Number(activity.loan_hours))
       out.loan_hours = Number(v.loan_hours);
-    // 4 ฟิลด์แรกเป็น NOT NULL ใน DB → skip ถ้า invalid
-    const requiredDates: ('start_at' | 'end_at' | 'registration_open_at' | 'registration_close_at')[] =
-      ['start_at', 'end_at', 'registration_open_at', 'registration_close_at'];
+    // 6 ฟิลด์เป็น NOT NULL ใน DB → skip ถ้า invalid
+    const requiredDates: (
+      | 'start_at'
+      | 'end_at'
+      | 'registration_open_at'
+      | 'registration_close_at'
+      | 'check_in_opens_at'
+      | 'check_in_closes_at'
+    )[] = [
+      'start_at',
+      'end_at',
+      'registration_open_at',
+      'registration_close_at',
+      'check_in_opens_at',
+      'check_in_closes_at',
+    ];
     for (const f of requiredDates) {
       const newIso = localToIso(v[f]);
       // skip ถ้า input ว่าง/invalid (กัน backend reject — column NOT NULL)
       // — เคสที่ pre-existing data ผิด (เช่น 0001-01-01) แล้ว user ยังไม่ได้กรอกใหม่
       if (newIso === null) continue;
-      if (newIso !== activity[f]) out[f] = newIso;
-    }
-    // check-in window — nullable; ส่ง null ได้ (= ใช้ default ของระบบ)
-    const nullableDates: ('check_in_opens_at' | 'check_in_closes_at')[] = [
-      'check_in_opens_at',
-      'check_in_closes_at',
-    ];
-    for (const f of nullableDates) {
-      const newIso = localToIso(v[f]);
       if (newIso !== activity[f]) out[f] = newIso;
     }
     return out;
@@ -1443,13 +1447,13 @@ function AdminEditDialog({
           <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3">
             <div className="mb-2 flex items-baseline justify-between">
               <span className="text-xs font-medium text-gray-700">
-                ช่วงเวลา check-in (ไม่บังคับ)
+                ช่วงเวลา check-in <span className="text-rose-600">*</span>
               </span>
               <span className="text-[10px] text-gray-500">
-                ปล่อยว่าง = ใช้ default ของระบบ
+                บังคับมีค่า (snapshot ฝัง row)
               </span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-[11px] text-gray-600">
                   เปิดให้ check-in
@@ -1461,27 +1465,9 @@ function AdminEditDialog({
                     setV({ ...v, check_in_opens_at: e.target.value })
                   }
                   disabled={busy}
+                  required
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
                 />
-              </div>
-              <div className="flex items-end pb-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setV({
-                      ...v,
-                      check_in_opens_at: '',
-                      check_in_closes_at: '',
-                    })
-                  }
-                  disabled={
-                    busy || (!v.check_in_opens_at && !v.check_in_closes_at)
-                  }
-                  className="text-xs text-gray-500 underline-offset-2 hover:text-gray-700 hover:underline disabled:opacity-30 disabled:no-underline"
-                  title="ล้างเพื่อใช้ default ของระบบ"
-                >
-                  ล้างทั้ง 2
-                </button>
               </div>
               <div>
                 <label className="mb-1 block text-[11px] text-gray-600">
@@ -1494,6 +1480,7 @@ function AdminEditDialog({
                     setV({ ...v, check_in_closes_at: e.target.value })
                   }
                   disabled={busy}
+                  required
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
                 />
               </div>
