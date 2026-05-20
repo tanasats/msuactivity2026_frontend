@@ -603,7 +603,7 @@ export function ActivityForm({
             disabled={isLimited}
           />
         </Field>
-        <Field label="รายละเอียด">
+        <Field label="รายละเอียด" as="div">
           <RichTextEditor
             value={value.description}
             onChange={(html) => setField('description', html)}
@@ -695,7 +695,7 @@ export function ActivityForm({
       </Section>
 
       {/* Section 2: เวลาและความจุ */}
-      <Section title="เวลา จำนวนที่รับ">
+      <Section title="วันเวลา จำนวนที่รับ">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="วันเวลาเริ่ม" required>
             <input
@@ -1025,26 +1025,33 @@ function Section({
   );
 }
 
+// Field wrapper — default ใช้ <label> (click-to-focus form control แรกข้างใน)
+//   ถ้า children เป็น contenteditable (Tiptap RichTextEditor) ที่มี <button> ภายใน
+//   ต้องใส่ as="div" ไม่งั้น browser จะ re-target click ไปที่ปุ่มแรกใน toolbar
+//   (เช่น ปุ่ม Bold) — ทำให้คลิกในพื้นที่ editor = toggle bold โดยไม่ตั้งใจ
 function Field({
   label,
   required,
   hint,
   children,
+  as = 'label',
 }: {
   label: string;
   required?: boolean;
   hint?: string;
   children: React.ReactNode;
+  as?: 'label' | 'div';
 }) {
+  const Wrapper = as;
   return (
-    <label className="block">
+    <Wrapper className="block">
       <span className="mb-1 inline-block text-sm font-medium text-gray-700">
         {label}
         {required && <span className="ml-1 text-rose-500">*</span>}
       </span>
       {hint && <span className="ml-2 text-xs text-gray-400">{hint}</span>}
       {children}
-    </label>
+    </Wrapper>
   );
 }
 
