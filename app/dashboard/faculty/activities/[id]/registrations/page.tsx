@@ -56,9 +56,11 @@ type Filter =
   | 'all'
   | 'pending'
   | 'registered'
-  | 'cancelled'
   | 'attended'
-  | 'pending_eval';
+  | 'pending_eval'
+  | 'passed'
+  | 'failed'
+  | 'cancelled';
 
 const FILTER_OPTIONS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -66,14 +68,30 @@ const FILTER_OPTIONS: { value: Filter; label: string }[] = [
   { value: 'registered', label: 'อนุมัติแล้ว' },
   { value: 'attended', label: 'เช็คอินแล้ว' },
   { value: 'pending_eval', label: 'รอประเมิน' },
+  { value: 'passed', label: 'ผ่าน' },
+  { value: 'failed', label: 'ไม่ผ่าน' },
   { value: 'cancelled', label: 'ยกเลิก/ปฏิเสธ' },
 ];
 
+// สีของ chip แต่ละ filter — สื่อความหมายตามผลลัพธ์
+//   active = solid (เห็นชัดว่าเลือกอยู่)
+//   idle   = outline + tinted hover (อ่านง่าย ไม่รบกวนสายตา)
+const FILTER_TONE: Record<Filter, { active: string; idle: string }> = {
+  all:          { active: 'bg-purple-600 border-gray-800 text-purple-50',     idle: 'border-gray-300 text-gray-700 hover:border-gray-500 hover:bg-gray-50' },
+  pending:      { active: 'bg-amber-600 border-amber-600 text-white',   idle: 'border-amber-300 text-amber-800 hover:border-amber-500 hover:bg-amber-50' },
+  registered:   { active: 'bg-blue-600 border-blue-600 text-white',     idle: 'border-blue-300 text-blue-800 hover:border-blue-500 hover:bg-blue-50' },
+  attended:     { active: 'bg-indigo-600 border-indigo-600 text-white', idle: 'border-indigo-300 text-indigo-800 hover:border-indigo-500 hover:bg-indigo-50' },
+  pending_eval: { active: 'bg-orange-600 border-orange-600 text-white', idle: 'border-orange-300 text-orange-800 hover:border-orange-500 hover:bg-orange-50' },
+  passed:       { active: 'bg-emerald-600 border-emerald-600 text-white', idle: 'border-emerald-300 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-50' },
+  failed:       { active: 'bg-rose-600 border-rose-600 text-white',     idle: 'border-rose-300 text-rose-700 hover:border-rose-500 hover:bg-rose-50' },
+  cancelled:    { active: 'bg-gray-500 border-gray-500 text-white',     idle: 'border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50' },
+};
+
 // FILTER_STATUSES: ใช้ status-only filter (null = ทั้งหมด)
-//   pending_eval ใช้ custom predicate (status=ATTENDED + evaluation_status=PENDING_EVALUATION)
+//   pending_eval/passed/failed ใช้ custom predicate (filter ตาม evaluation_status เพิ่ม)
 //   ไม่อยู่ในตารางนี้
 const FILTER_STATUSES: Record<
-  Exclude<Filter, 'pending_eval'>,
+  Exclude<Filter, 'pending_eval' | 'passed' | 'failed'>,
   RegistrationStatus[] | null
 > = {
   all: null,
@@ -164,7 +182,7 @@ export default function FacultyRegistrationsPage() {
   }, [id]);
 
   // 1. filter ตาม status tab
-  //    pending_eval = ATTENDED + evaluation_status = 'PENDING_EVALUATION' (custom predicate)
+  //    pending_eval / passed / failed = ATTENDED + evaluation_status ตรง (custom predicate)
   //    อื่น ๆ ใช้ FILTER_STATUSES (status-only)
   const filteredItems = useMemo(() => {
     if (!items) return null;
@@ -173,6 +191,20 @@ export default function FacultyRegistrationsPage() {
         (r) =>
           r.registration_status === 'ATTENDED' &&
           r.evaluation_status === 'PENDING_EVALUATION',
+      );
+    }
+    if (filter === 'passed') {
+      return items.filter(
+        (r) =>
+          r.registration_status === 'ATTENDED' &&
+          r.evaluation_status === 'PASSED',
+      );
+    }
+    if (filter === 'failed') {
+      return items.filter(
+        (r) =>
+          r.registration_status === 'ATTENDED' &&
+          r.evaluation_status === 'FAILED',
       );
     }
     const allowed = FILTER_STATUSES[filter];
@@ -332,6 +364,16 @@ export default function FacultyRegistrationsPage() {
         (r) =>
           r.registration_status === 'ATTENDED' &&
           r.evaluation_status === 'PENDING_EVALUATION',
+      ).length,
+      passed: items.filter(
+        (r) =>
+          r.registration_status === 'ATTENDED' &&
+          r.evaluation_status === 'PASSED',
+      ).length,
+      failed: items.filter(
+        (r) =>
+          r.registration_status === 'ATTENDED' &&
+          r.evaluation_status === 'FAILED',
       ).length,
       cancelled: items.filter((r) =>
         FILTER_STATUSES.cancelled!.includes(r.registration_status),
@@ -593,11 +635,15 @@ export default function FacultyRegistrationsPage() {
         )}
       </div>
 
-      {/* Toolbar: filter chips + search + sort */}
-      <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:px-0 lg:pb-0">
+      {/* Toolbar — แยก 2 แถว
+            แถว 1: filter chips 8 ปุ่ม เต็มแถว (grid responsive)
+            แถว 2: search + role filter + sort */}
+      <div className="mb-3 space-y-2">
+        {/* Row 1: filter chips */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
           {FILTER_OPTIONS.map((opt) => {
             const active = filter === opt.value;
+            const tone = FILTER_TONE[opt.value];
             let count: number | null = null;
             if (counts) {
               count =
@@ -610,17 +656,15 @@ export default function FacultyRegistrationsPage() {
                 key={opt.value}
                 type="button"
                 onClick={() => setFilter(opt.value)}
-                className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs transition ${
-                  active
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50'
+                className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium shadow-sm transition ${
+                  active ? tone.active : `bg-white ${tone.idle}`
                 }`}
               >
-                {opt.label}
+                <span>{opt.label}</span>
                 {count !== null && (
                   <span
-                    className={`ml-1.5 rounded-full px-1.5 text-[10px] ${
-                      active ? 'bg-white/20' : 'bg-gray-100 text-gray-600'
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                      active ? 'bg-white/25' : 'bg-gray-100 text-gray-700'
                     }`}
                   >
                     {count}
@@ -631,9 +675,10 @@ export default function FacultyRegistrationsPage() {
           })}
         </div>
 
+        {/* Row 2: search + role + sort (flex; search ขยายเต็มที่เหลือ) */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          {/* Search input */}
-          <div className="relative w-full sm:w-64">
+          {/* Search input — flex-1 ให้ขยายเต็มที่เหลือ */}
+          <div className="relative flex-1">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
               aria-hidden
@@ -672,7 +717,7 @@ export default function FacultyRegistrationsPage() {
             onChange={(e) =>
               setRoleFilter(e.target.value as 'all' | ParticipantRole)
             }
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-48"
             aria-label="กรองตามสถานภาพในกิจกรรม"
           >
             <option value="all">สถานภาพทั้งหมด</option>
@@ -687,7 +732,7 @@ export default function FacultyRegistrationsPage() {
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-48"
             aria-label="จัดเรียง"
           >
             {SORT_OPTIONS.map((opt) => (

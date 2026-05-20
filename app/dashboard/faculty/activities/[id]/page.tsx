@@ -250,6 +250,18 @@ export default function FacultyActivityDetailPage() {
 
       </div>
 
+      {/* Poster — รูปหน้าปกกิจกรรม (ถ้ามี) */}
+      {activity.poster_url && (
+        <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={activity.poster_url}
+            alt={activity.title}
+            className="h-auto w-full"
+          />
+        </div>
+      )}
+
       {/* Form (full edit / limited edit) หรือ Read-only summary
             DRAFT → can_edit       → mode='edit' (แก้ทุกฟิลด์)
             WORK  → can_edit_limited → mode='edit-limited' (แก้เฉพาะฟิลด์ที่อนุญาต)
