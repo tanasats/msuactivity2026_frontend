@@ -237,6 +237,7 @@ export function ActivityForm({
   );
   const [posterUploading, setPosterUploading] = useState(false);
   const [posterError, setPosterError] = useState<string | null>(null);
+  const [posterDragOver, setPosterDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // เก็บ object URL ของ local preview เพื่อ revoke ตอน unmount/replace
   const localObjectUrlRef = useRef<string | null>(null);
@@ -531,22 +532,75 @@ export function ActivityForm({
       >
       <Section title="ภาพโปสเตอร์กิจกรรม">
         <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
-          {/* Preview */}
-          <div className="flex h-48 w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-300 bg-gray-50 md:h-52 md:w-48">
+          {/* Preview + Drop zone
+                - click → เปิด file picker
+                - drag&drop → handlePosterFile
+                - visual cue เมื่อ drag over (border + bg) */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!isLimited) setPosterDragOver(true);
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              if (!isLimited) setPosterDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              // กัน flicker จาก child elements: เช็คว่า leave จริงๆ ออกจาก zone
+              if (
+                e.currentTarget.contains(e.relatedTarget as Node | null)
+              )
+                return;
+              setPosterDragOver(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setPosterDragOver(false);
+              if (isLimited) return;
+              const f = e.dataTransfer.files?.[0];
+              if (f) handlePosterFile(f);
+            }}
+            disabled={isLimited || posterUploading}
+            aria-label="คลิกหรือลากไฟล์มาวางเพื่ออัปโหลดโปสเตอร์"
+            className={`group relative flex h-48 w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed bg-gray-50 transition md:h-52 md:w-48 ${
+              posterDragOver
+                ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/30'
+            } disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:bg-gray-50`}
+          >
             {posterPreviewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={posterPreviewUrl}
-                alt="poster preview"
-                className="h-full w-full object-cover"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={posterPreviewUrl}
+                  alt="poster preview"
+                  className="h-full w-full object-cover"
+                />
+                {/* overlay บอกให้รู้ว่าคลิก/drop เพื่อเปลี่ยนได้ */}
+                {!isLimited && (
+                  <div
+                    className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white transition ${
+                      posterDragOver ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                  >
+                    {posterDragOver ? 'วางที่นี่' : 'คลิก/ลากเพื่อเปลี่ยน'}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="flex flex-col items-center gap-1 text-xs text-gray-400">
-                <ImagePlus className="h-8 w-8" aria-hidden />
-                <span>ยังไม่มีภาพ</span>
+              <div className="flex flex-col items-center gap-1.5 text-xs text-gray-500">
+                <ImagePlus
+                  className={`h-8 w-8 transition ${posterDragOver ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}
+                  aria-hidden
+                />
+                <span className={posterDragOver ? 'font-medium text-blue-700' : ''}>
+                  {posterDragOver ? 'วางที่นี่' : 'คลิกหรือลากไฟล์มาวาง'}
+                </span>
               </div>
             )}
-          </div>
+          </button>
 
           {/* Controls */}
           <div className="space-y-2">
@@ -557,12 +611,17 @@ export function ActivityForm({
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) handlePosterFile(f);
+                // reset value เพื่อให้เลือกไฟล์เดิมซ้ำได้
+                e.target.value = '';
               }}
-              className="block w-full text-xs file:mr-3 file:rounded-lg file:border file:border-gray-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-gray-700 hover:file:bg-gray-50"
+              className="hidden"
             />
             <p className="text-xs text-gray-500">
               JPG / PNG / WebP, ไม่เกิน {POSTER_MAX_BYTES / 1024 / 1024} MB
               <span className="ml-1 text-rose-500">*</span> ต้องอัปโหลด
+            </p>
+            <p className="text-xs text-gray-400">
+              คลิกที่กรอบทางซ้าย หรือลากไฟล์มาวางก็ได้
             </p>
 
             {posterUploading && (

@@ -7,6 +7,7 @@ import {
   ClipboardList,
   GraduationCap,
   History,
+  Home,
   LayoutDashboard,
   ListChecks,
   Megaphone,
@@ -33,6 +34,12 @@ interface NavItem {
 //   - Dashboard ของ super_admin เอง (master data + system)
 //   - ลิงก์ไป admin section (super_admin มีสิทธิ์ทุกอย่างที่ admin ทำได้)
 const NAV_ITEMS: NavItem[] = [
+  // ลิงก์ออกไป public landing — sidebar จะหายไปเพราะอยู่นอก dashboard scope
+  { 
+    href: '/', 
+    label: 'หน้าหลัก', 
+    Icon: Home 
+  },  
   { href: '/dashboard/super-admin', label: 'ภาพรวมระบบ', Icon: LayoutDashboard },
   {
     href: '/dashboard/super-admin/faculties',
