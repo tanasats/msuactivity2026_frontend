@@ -291,13 +291,19 @@ export default function LandingPage() {
           )}
           {searchResults !== null && searchResults.length > 0 && (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {searchResults.map((a) => (
-                <ActivityCard
-                  key={a.id}
-                  activity={a}
-                  variant={a.status === 'COMPLETED' ? 'upcoming' : 'open'}
-                />
-              ))}
+              {searchResults.map((a) => {
+                // เลือก variant ตามสถานะจริง:
+                //   COMPLETED         → 'completed' (badge "เสร็จสิ้น")
+                //   WORK + start>now  → 'upcoming'  (badge "กำลังจะมา")
+                //   อื่น (กำลังดำเนินการ/เปิดรับสมัคร) → 'open'
+                const variant =
+                  a.status === 'COMPLETED'
+                    ? 'completed'
+                    : new Date(a.start_at).getTime() > Date.now()
+                      ? 'upcoming'
+                      : 'open';
+                return <ActivityCard key={a.id} activity={a} variant={variant} />;
+              })}
             </div>
           )}
         </section>

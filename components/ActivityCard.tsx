@@ -12,8 +12,20 @@ const CATEGORY_COLORS: Record<number, string> = {
 
 interface Props {
   activity: ActivitySummary;
-  variant?: 'open' | 'upcoming';
+  variant?: 'open' | 'upcoming' | 'completed';
 }
+
+// badge ที่แปะมุมขวาบนรูป poster — แต่ละ variant สื่อสถานะต่างกัน
+//   open      = ไม่แปะ (เปิดรับสมัคร — สถานะปกติ)
+//   upcoming  = "กำลังจะมา" (indigo) — start_at > now
+//   completed = "เสร็จสิ้น" (slate) — status='COMPLETED'
+const POSTER_BADGE: Record<
+  Exclude<Props['variant'], 'open' | undefined>,
+  { label: string; cls: string }
+> = {
+  upcoming:  { label: 'กำลังจะมา', cls: 'bg-indigo-600/90 text-white' },
+  completed: { label: 'เสร็จสิ้น',  cls: 'bg-slate-700/90 text-white' },
+};
 
 export function ActivityCard({ activity, variant = 'open' }: Props) {
   const filledRatio = Math.min(activity.registered_count / activity.capacity, 1);
@@ -42,9 +54,11 @@ export function ActivityCard({ activity, variant = 'open' }: Props) {
             <span className="text-xs">ไม่มีโปสเตอร์</span>
           </div>
         )}
-        {variant === 'upcoming' && (
-          <span className="absolute right-2 top-2 rounded-full bg-indigo-600/90 px-2.5 py-0.5 text-xs font-medium text-white shadow-sm">
-            กำลังจะมา
+        {variant !== 'open' && (
+          <span
+            className={`absolute right-2 top-2 rounded-full px-2.5 py-0.5 text-xs font-medium shadow-sm ${POSTER_BADGE[variant].cls}`}
+          >
+            {POSTER_BADGE[variant].label}
           </span>
         )}
       </div>
@@ -104,7 +118,7 @@ export function ActivityCard({ activity, variant = 'open' }: Props) {
         )}
 
         <div className="mt-auto pt-3">
-          {variant === 'open' ? (
+          {variant === 'open' && (
             <>
               <div className="mb-1 flex justify-between text-xs">
                 <span className="text-gray-500">
@@ -124,9 +138,15 @@ export function ActivityCard({ activity, variant = 'open' }: Props) {
                 />
               </div>
             </>
-          ) : (
+          )}
+          {variant === 'upcoming' && (
             <div className="text-xs text-gray-500">
               เปิดรับสมัคร {formatDate(activity.registration_open_at)}
+            </div>
+          )}
+          {variant === 'completed' && (
+            <div className="text-xs text-gray-500">
+              จัดเมื่อ {formatDate(activity.end_at)}
             </div>
           )}
         </div>
