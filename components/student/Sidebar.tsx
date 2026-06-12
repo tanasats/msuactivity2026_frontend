@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Award,
   Heart,
   Home,
   LayoutDashboard,
@@ -38,6 +39,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'กิจกรรมที่ฉันสนใจ',
     Icon: Heart,
     matchPrefix: '/dashboard/student/interests',
+  },
+  {
+    href: '/dashboard/student/certificates',
+    label: 'ขอ Transcript กิจกรรม',
+    Icon: Award,
+    matchPrefix: '/dashboard/student/certificates',
   },
 ];
 

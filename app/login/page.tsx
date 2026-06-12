@@ -52,9 +52,13 @@ export default function LoginPage() {
           <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
         )}
 
-        <p className="mt-6 text-xs text-gray-400">
+        <p className="mt-6 text-xs text-gray-400 text-center">
           ใช้บัญชีอีเมลของมหาวิทยาลัย <span className="font-mono">@msu.ac.th</span> เท่านั้น
         </p>
+        <div className='flex justify-between text-xs mt-4 text-blue-700'>
+        <Link href={'https://pdpa.msu.ac.th/privacy-policy'}>Privacy Policy</Link>  
+        <Link href={'https://portal.msu.ac.th'}>Help</Link>      
+        </div>
       </div>
       <div className="pt-5 text-slate-500">
         <Link href={'/'}>กลับหน้าหลัก</Link>

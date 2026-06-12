@@ -756,6 +756,95 @@ export interface StudentAggregateStats {
   }[];
 }
 
+// ── certificate (transcript กิจกรรม) ────────────────────────────
+
+export type CertificateStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'ISSUED';
+
+// ผลการคำนวณ eligibility — จาก GET /api/student/certificates/eligibility
+//   ใช้กับ student page แสดง breakdown 3 ข้อ + รายกิจกรรม qualifying
+export interface CertificateEligibility {
+  rule: {
+    id: number;
+    group_a_prefixes: string[];
+    group_b_prefixes: string[];
+    group_a_min_activities: number;
+    group_b_min_activities: number;
+    min_total_hours: number;
+    effective_from: string;
+  };
+  group_a: {
+    prefixes: string[];
+    actual_count: number;
+    required_count: number;
+    met: boolean;
+  };
+  group_b: {
+    prefixes: string[];
+    actual_count: number;
+    required_count: number;
+    met: boolean;
+  };
+  hours: {
+    actual: number;
+    required: number;
+    met: boolean;
+  };
+  eligible: boolean;
+  qualifying: {
+    group_a: CertificateQualifyingActivity[];
+    group_b: CertificateQualifyingActivity[];
+  };
+}
+
+export interface CertificateQualifyingActivity {
+  activity_id: number;
+  code: string;
+  title: string;
+  hours: number;
+  prefix: string;
+}
+
+// คำขอ certificate — จาก GET /api/student/certificates หรือ /:id
+export interface CertificateRequest {
+  id: number;
+  status: CertificateStatus;
+  total_hours_at_request: number;
+  rule_snapshot: unknown; // jsonb — รายละเอียดละเอียดเก็บไว้ — ไม่ render ใน UI หลัก
+  requested_at: string;
+  reviewed_at: string | null;
+  reviewed_by: number | null;
+  rejected_reason: string | null;
+  issued_at: string | null;
+  document_no: string | null;
+  pdf_storage_key?: string | null;
+}
+
+// admin queue row — extend ด้วยข้อมูล user + reviewed_by_name
+export interface AdminCertificateRequest extends CertificateRequest {
+  user_id: number;
+  user_email: string;
+  user_full_name: string;
+  user_msu_id: string | null;
+  user_faculty_name: string | null;
+  reviewed_by_name: string | null;
+}
+
+// cert_requirements row — สำหรับ rule editor + history view
+export interface CertRequirementRule {
+  id: number;
+  group_a_prefixes: string[];
+  group_b_prefixes: string[];
+  group_a_min_activities: number;
+  group_b_min_activities: number;
+  min_total_hours: number;
+  effective_from: string;
+  effective_to: string | null;
+  note: string | null;
+  created_by: number | null;
+  created_by_name?: string | null; // มีใน history endpoint
+  created_at: string;
+}
+
 export type BulkAddErrorReason =
   | 'NOT_FOUND'
   | 'NOT_STUDENT'

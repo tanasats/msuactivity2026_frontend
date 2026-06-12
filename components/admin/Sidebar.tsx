@@ -3,31 +3,36 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Award,
   ClipboardList,
   GraduationCap,
   Home,
   LayoutDashboard,
   ListChecks,
   Megaphone,
+  ScrollText,
   X,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
+import type { UserRole } from '@/lib/types';
 
 interface NavItem {
   href: string;
   label: string;
   Icon: LucideIcon;
   matchPrefix?: string;
+  // ถ้ามี → ต้อง role ตรง 1 ใน list ถึงโชว์ (เช่น cert rule editor = super_admin only)
+  requireRole?: UserRole[];
 }
 
 const NAV_ITEMS: NavItem[] = [
     // ลิงก์ออกไป public landing — sidebar จะหายไปเพราะอยู่นอก dashboard scope
-  { 
-    href: '/', 
-    label: 'หน้าหลัก', 
-    Icon: Home 
+  {
+    href: '/',
+    label: 'หน้าหลัก',
+    Icon: Home
   },
   { href: '/dashboard/admin', label: 'Dashboard', Icon: LayoutDashboard },
   {
@@ -47,6 +52,19 @@ const NAV_ITEMS: NavItem[] = [
     label: 'ค้นข้ามกิจกรรม',
     Icon: ListChecks,
     matchPrefix: '/dashboard/admin/registrations',
+  },
+  {
+    href: '/dashboard/admin/certificates',
+    label: 'คำขอ Transcript',
+    Icon: Award,
+    matchPrefix: '/dashboard/admin/certificates',
+  },
+  {
+    href: '/dashboard/admin/cert-requirements',
+    label: 'เกณฑ์ Transcript',
+    Icon: ScrollText,
+    matchPrefix: '/dashboard/admin/cert-requirements',
+    requireRole: ['super_admin'],
   },
   {
     href: '/dashboard/admin/announcements',
@@ -122,7 +140,9 @@ export function Sidebar({ open, onClose }: Props) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter(
+            (item) => !item.requireRole || (user?.role && item.requireRole.includes(user.role)),
+          ).map((item) => {
             const active = isActive(item);
             return (
               <Link
