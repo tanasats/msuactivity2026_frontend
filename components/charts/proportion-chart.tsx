@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { formatNumber } from '@/lib/format';
 
 // ── Shared chart primitives (proportion bar style) ────────────────
@@ -6,8 +7,9 @@ import { formatNumber } from '@/lib/format';
 //   - card shell: rounded-2xl + border + shadow-sm
 //   - bar: horizontal proportion with right-aligned count + percentage
 
+// padding responsive: p-4 บนมือถือ ลดความแออัด, p-5 บน sm+
 export const CHART_CARD =
-  'rounded-2xl border border-gray-200 bg-white p-5 shadow-sm';
+  'rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5';
 
 // rainbow 5 สี — โทนกลาง (400) เพื่อให้ผ่อนตา + เด่นพอบนพื้นขาว
 export const RAINBOW_PALETTE = [
@@ -46,7 +48,8 @@ export function ProportionBar({
   colorClass,
   countSuffix = '',
 }: {
-  label: string;
+  // ReactNode รองรับทั้ง string ปกติ + JSX ที่ responsive (เช่น show code mobile, ชื่อเต็ม desktop)
+  label: ReactNode;
   count: number;
   total: number;
   max: number;
@@ -56,10 +59,14 @@ export function ProportionBar({
   const pct = total > 0 ? (count / total) * 100 : 0;
   const barPct = (count / max) * 100;
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="truncate font-medium text-gray-700">{label}</span>
-        <span className="ml-2 shrink-0 tabular-nums text-gray-600">
+    <div className="min-w-0">
+      {/* flex row — label ซ้าย (หดได้ + truncate), count ขวา (shrink-0)
+            ต้องมี min-w-0 บน label ไม่งั้น truncate ไม่ทำงานบน flex */}
+      <div className="mb-1 flex items-center gap-2 text-xs">
+        <span className="min-w-0 flex-1 truncate font-medium text-gray-700">
+          {label}
+        </span>
+        <span className="shrink-0 tabular-nums text-gray-600">
           {formatNumber(count)}
           {countSuffix && <span className="ml-1 text-gray-500">{countSuffix}</span>}
           {total > 0 && (

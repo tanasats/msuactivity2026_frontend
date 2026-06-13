@@ -829,6 +829,16 @@ export interface AdminCertificateRequest extends CertificateRequest {
   reviewed_by_name: string | null;
 }
 
+// public cert requirement — landing page ใช้แสดงเกณฑ์ให้นิสิตเห็น
+export interface PublicCertRequirement {
+  group_a_prefixes: string[];
+  group_b_prefixes: string[];
+  group_a_min_activities: number;
+  group_b_min_activities: number;
+  min_total_hours: number;
+  effective_from: string;
+}
+
 // cert_requirements row — สำหรับ rule editor + history view
 export interface CertRequirementRule {
   id: number;

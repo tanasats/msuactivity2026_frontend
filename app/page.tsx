@@ -4,14 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import {
+  Award,
+  Building2,
   ClipboardList,
+  Clock,
   LayoutDashboard,
   Loader2,
   Search,
   Users,
+  UsersRound,
   X,
 } from 'lucide-react';
-import type { ActivitySummary, LandingStats } from '@/lib/types';
+import type { ActivitySummary, LandingStats, PublicCertRequirement, User } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
 import { ActivityCard } from '@/components/ActivityCard';
 import {
@@ -32,10 +36,11 @@ interface LandingData {
   stats: LandingStats;
   open: ActivitySummary[];
   upcoming: ActivitySummary[];
+  certRule: PublicCertRequirement | null;  // null = ระบบยังไม่ตั้งเกณฑ์ (rare)
 }
 
 async function loadLandingData(): Promise<LandingData> {
-  const [statsRes, openRes, upcomingRes] = await Promise.all([
+  const [statsRes, openRes, upcomingRes, certRuleRes] = await Promise.all([
     publicApi.get<LandingStats>('/api/public/landing-stats'),
     publicApi.get<{ items: ActivitySummary[] }>('/api/public/activities', {
       params: { filter: 'open', limit: 12 },
@@ -43,6 +48,10 @@ async function loadLandingData(): Promise<LandingData> {
     publicApi.get<{ items: ActivitySummary[] }>('/api/public/activities', {
       params: { filter: 'upcoming', limit: 18 },
     }),
+    // cert rule — best-effort (404 ถ้ายังไม่ตั้งเกณฑ์ → section ซ่อนเอง)
+    publicApi
+      .get<PublicCertRequirement>('/api/public/cert-requirement')
+      .catch(() => null),
   ]);
   // ซ่อน duplicate: upcoming ที่อยู่ใน open อยู่แล้ว ไม่ต้องโชว์ซ้ำ
   const openIds = new Set(openRes.data.items.map((a) => a.id));
@@ -53,6 +62,7 @@ async function loadLandingData(): Promise<LandingData> {
     stats: statsRes.data,
     open: openRes.data.items,
     upcoming: upcomingDeduped,
+    certRule: certRuleRes?.data ?? null,
   };
 }
 
@@ -127,6 +137,16 @@ export default function LandingPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      {/* Hero banner area — background image ชิดบน, ครอบ header + hero section
+            - bg-cover + bg-top: image กว้างเต็ม + ชิดบน + crop กลางถ้าจอแคบเกินไป
+            - minHeight 300px: รับประกันความสูงขั้นต่ำของพื้นที่ภาพ */}
+      <div
+        className="w-full bg-cover bg-top bg-no-repeat"
+        // style={{
+        //   minHeight: '300px',
+        //   backgroundImage: "url('/images/activity-bg.png')",
+        // }}
+      >
       {/* Top bar */}
       <header className="border-b border-gray-200 bg-white/70 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -210,6 +230,8 @@ export default function LandingPage() {
           )}
         </div>
       </section>
+      </div>
+      {/* ── จบ hero banner area ── */}
 
 {/* Stats — 2 cards --ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
 {!isSearching && (
@@ -253,6 +275,12 @@ export default function LandingPage() {
 )}
 
 
+      {/* Transcript criteria — กระตุ้นนิสิตให้รู้เป้าหมาย / ดู progress ตัวเอง
+            ซ่อนตอน searching เพื่อให้ focus ผลค้นหา */}
+      {!isSearching && data?.certRule && (
+        <CertCriteriaSection rule={data.certRule} user={user} />
+      )}
+
       {/* Open + Upcoming — ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
       {!isSearching && (
       <>
@@ -264,9 +292,9 @@ export default function LandingPage() {
             <ByCategoryChart data={data.stats.by_category} />
             <BySkillChart data={data.stats.by_skill} />
           </section>
-        )}     
+        )}
       </div>
-      </> 
+      </>
       )}
 
 
@@ -355,6 +383,137 @@ export default function LandingPage() {
         </div>
       </footer>
     </main>
+  );
+}
+
+// ─── Certificate criteria section ─────────────────────────────
+//   แสดงเกณฑ์การขอ transcript กิจกรรม บน landing page เพื่อกระตุ้นนิสิตให้รู้เป้าหมาย
+//   - guest / non-student → CTA "เข้าสู่ระบบเพื่อตรวจสถานะ"
+//   - student logged in   → CTA "ดูสถานะของคุณ" → /dashboard/student/certificates
+//   - admin/super_admin   → ไม่มี CTA (เห็นเป็นข้อมูลทั่วไป)
+function CertCriteriaSection({
+  rule,
+  user,
+}: {
+  rule: PublicCertRequirement;
+  user: User | null;
+}) {
+  const ctaHref =
+    user?.role === 'student'
+      ? '/dashboard/student/certificates'
+      : !user
+        ? '/login'
+        : null; // admin/faculty — ไม่มี CTA
+  const ctaLabel =
+    user?.role === 'student'
+      ? 'ดูสถานะของคุณ'
+      : 'เข้าสู่ระบบเพื่อตรวจสถานะ';
+
+  return (
+    <section className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 py-10 md:py-12">
+      <div className="mx-auto max-w-6xl px-6">
+        {/* Header */}
+        <div className="mb-6 text-center md:mb-8">
+          {/* <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 ring-4 ring-amber-50">
+            <Award className="h-7 w-7 text-amber-600" aria-hidden />
+          </div> */}
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">
+            ทำกิจกรรมครบเกณฑ์ — รับ Transcript กิจกรรม
+          </h2>
+          <p className="mx-auto mt-2 max-w-2xl text-sm text-gray-600 md:text-base">
+            เอกสารแสดงผลการเข้าร่วมกิจกรรมตลอดการศึกษา —
+            ใช้ประกอบสมัครงาน ทุนการศึกษา หรือฝึกงาน
+          </p>
+        </div>
+
+        {/* 3 criteria cards */}
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
+          <CriteriaCard
+            icon={<Building2 className="h-5 w-5" aria-hidden />}
+            number={rule.group_a_min_activities}
+            unit="กิจกรรม"
+            title="คณะ / มหาวิทยาลัย"
+            hint={`รหัสขึ้นต้นด้วย ${rule.group_a_prefixes.join(', ')}`}
+            tone="blue"
+          />
+          <CriteriaCard
+            icon={<UsersRound className="h-5 w-5" aria-hidden />}
+            number={rule.group_b_min_activities}
+            unit="กิจกรรม"
+            title="องค์กรนิสิต"
+            hint={`รหัสขึ้นต้นด้วย ${rule.group_b_prefixes.join(', ')}`}
+            tone="violet"
+          />
+          <CriteriaCard
+            icon={<Clock className="h-5 w-5" aria-hidden />}
+            number={rule.min_total_hours}
+            unit="ชั่วโมง"
+            title="ชั่วโมงรวมทั้ง 2 กลุ่ม"
+            hint="นับเฉพาะกิจกรรมที่ผ่านการประเมิน"
+            tone="emerald"
+          />
+        </div>
+
+        {/* CTA */}
+        <div className="mt-6 flex flex-col items-center gap-3 sm:mt-8 sm:flex-row sm:justify-center">
+          {ctaHref && (
+            <Link
+              href={ctaHref}
+              className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-700 sm:w-auto"
+            >
+              <Award className="h-4 w-4" aria-hidden />
+              {ctaLabel}
+            </Link>
+          )}
+          <Link
+            href="#open-activities"
+            className="text-sm font-medium text-amber-800 hover:underline"
+          >
+            ดูกิจกรรมที่เปิดรับสมัคร →
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CriteriaCard({
+  icon,
+  number,
+  unit,
+  title,
+  hint,
+  tone,
+}: {
+  icon: React.ReactNode;
+  number: number;
+  unit: string;
+  title: string;
+  hint: string;
+  tone: 'blue' | 'violet' | 'emerald';
+}) {
+  const toneClass = {
+    blue: 'bg-blue-100 text-blue-700',
+    violet: 'bg-violet-100 text-violet-700',
+    emerald: 'bg-emerald-100 text-emerald-700',
+  }[tone];
+  return (
+    <div className="rounded-2xl border border-white/60 bg-white/90 p-4 shadow-sm backdrop-blur-sm sm:p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${toneClass}`}>
+          {icon}
+        </div>
+        <p className="text-xs font-medium text-gray-500">อย่างน้อย</p>
+      </div>
+      <p className="text-3xl font-bold leading-none text-gray-900 sm:text-4xl">
+        {formatNumber(number)}
+        <span className="ml-1.5 text-base font-medium text-gray-500 sm:text-lg">
+          {unit}
+        </span>
+      </p>
+      <p className="mt-2 text-sm font-medium text-gray-800">{title}</p>
+      <p className="mt-0.5 text-xs text-gray-500">{hint}</p>
+    </div>
   );
 }
 

@@ -160,35 +160,37 @@ export default function StudentDashboardPage() {
   );
 
   return (
-    <div className="mx-auto max-w-full p-6 md:p-8">
-      {/* Profile header — แสดงข้อมูลตัวนิสิตจาก auth store (ไม่ต้อง fetch เพิ่ม) */}
+    <div className="mx-auto max-w-full p-4 md:p-6 lg:p-8">
+      {/* Profile header — แสดงข้อมูลตัวนิสิตจาก auth store (ไม่ต้อง fetch เพิ่ม)
+            avatar + ชื่อ + email + chips เท่านั้น — สะอาด ไม่มีปุ่ม action
+            (CSV ย้ายไปคู่กับ year selector ด้านล่าง เพราะ respect year filter) */}
       {user && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-wrap items-start gap-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
+          <div className="flex items-start gap-3 sm:gap-4">
             {user.picture_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={user.picture_url}
                 alt={user.full_name}
-                width={64}
-                height={64}
-                className="h-16 w-16 shrink-0 rounded-full border border-gray-200 bg-gray-100"
+                width={56}
+                height={56}
+                className="h-14 w-14 shrink-0 rounded-full border border-gray-200 bg-gray-100 sm:h-16 sm:w-16"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-200 text-2xl font-bold text-gray-500">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xl font-bold text-gray-500 sm:h-16 sm:w-16 sm:text-2xl">
                 {user.full_name.charAt(0)}
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="break-words text-lg font-bold text-gray-900 sm:text-xl">
                 {user.full_name}
               </h1>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
-                <Mail className="h-3.5 w-3.5" aria-hidden />
-                {user.email}
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500 sm:text-sm">
+                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="truncate">{user.email}</span>
               </p>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-600">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-gray-600 sm:gap-3">
                 {user.msu_id && (
                   <span className="font-mono">{user.msu_id}</span>
                 )}
@@ -199,35 +201,6 @@ export default function StudentDashboardPage() {
                 )}
               </div>
             </div>
-            {/* Export CSV — ใช้ filter ปีตามที่เลือก ('all' = ทุกปี → ไม่ส่ง academic_year) */}
-            <button
-              type="button"
-              onClick={() => {
-                const idLabel = user.msu_id || user.id;
-                const stamp = new Date().toISOString().slice(0, 10);
-                const specificYear =
-                  typeof academicYear === 'number' ? academicYear : null;
-                const url =
-                  specificYear !== null
-                    ? `/api/student/registrations.csv?academic_year=${specificYear}`
-                    : '/api/student/registrations.csv';
-                const yearSuffix = specificYear !== null ? `-${specificYear}` : '-all';
-                downloadAuthed(
-                  url,
-                  `my-activities-${idLabel}${yearSuffix}-${stamp}.csv`,
-                );
-              }}
-              title="ดาวน์โหลดข้อมูลกิจกรรมของฉัน (CSV)"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <Download className="h-4 w-4" aria-hidden />
-              CSV
-              {academicYear !== null && (
-                <span className="ml-1 text-xs text-gray-400">
-                  · {academicYear === 'all' ? 'ทุกปี' : `ปี ${academicYear}`}
-                </span>
-              )}
-            </button>
           </div>
         </div>
       )}
@@ -244,8 +217,9 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
-      {/* 4-tile aggregate stats — ทุกปีรวม (ไม่ขึ้นกับ year selector ด้านล่าง) */}
-      <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 4-tile aggregate stats — ทุกปีรวม (ไม่ขึ้นกับ year selector ด้านล่าง)
+            mobile: 2 cols (กระชับ ไม่ scroll เยอะ) / lg: 4 cols */}
+      <section className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-3 lg:grid-cols-4">
         <StatTile
           icon={<Trophy className="h-5 w-5" aria-hidden />}
           label="ชั่วโมงกิจกรรม"
@@ -286,8 +260,9 @@ export default function StudentDashboardPage() {
         />
       </section>
 
-      {/* Charts — by year / by category / by skill (rainbow palette เหมือน admin student detail) */}
-      <section className="mt-5 grid gap-5 lg:grid-cols-3">
+      {/* Charts — by year / by category / by skill (rainbow palette เหมือน admin student detail)
+            mobile: ซ้อนแนวตั้ง, gap-3 (กระชับกว่า lg) */}
+      <section className="mt-4 grid gap-3 sm:mt-5 sm:gap-5 lg:grid-cols-3">
         <div className={CHART_CARD}>
           <ChartHeader title="ชั่วโมงต่อปีการศึกษา" />
           {!aggregate ? (
@@ -358,33 +333,72 @@ export default function StudentDashboardPage() {
           ) : aggregate.by_skill.every((s) => s.count === 0) ? (
             <p className="text-xs text-gray-400">ยังไม่มีทักษะที่ได้รับ</p>
           ) : (
-            <div className="space-y-3">
-              {[...aggregate.by_skill]
-                .sort((a, b) => b.count - a.count)
-                .map((s, i) => {
-                  const max = Math.max(
-                    1,
-                    ...aggregate.by_skill.map((x) => x.count),
-                  );
-                  return (
-                    <ProportionBar
-                      key={s.skill_id}
-                      label={`${s.skill_code} · ${s.skill_name}`}
-                      count={s.count}
-                      total={0}
-                      max={max}
-                      colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
-                      countSuffix="กิจกรรม"
-                    />
-                  );
-                })}
-            </div>
+            <>
+              <div className="space-y-3">
+                {[...aggregate.by_skill]
+                  .sort((a, b) => b.count - a.count)
+                  .map((s, i) => {
+                    const max = Math.max(
+                      1,
+                      ...aggregate.by_skill.map((x) => x.count),
+                    );
+                    return (
+                      <ProportionBar
+                        key={s.skill_id}
+                        // mobile: แสดงเฉพาะ code (ชื่อเต็มยาวเกินจอ ตัด...อ่านไม่รู้เรื่อง)
+                        // sm+:    แสดง "S1 · ทักษะการคิดเชิงวิเคราะห์..." แบบเดิม
+                        label={
+                          <>
+                            <span
+                              className="font-mono sm:hidden"
+                              title={s.skill_name}
+                            >
+                              {s.skill_code}
+                            </span>
+                            <span className="hidden sm:inline">
+                              {s.skill_code} · {s.skill_name}
+                            </span>
+                          </>
+                        }
+                        count={s.count}
+                        total={0}
+                        max={max}
+                        colorClass={RAINBOW_PALETTE[i % RAINBOW_PALETTE.length]}
+                        countSuffix="กิจกรรม"
+                      />
+                    );
+                  })}
+              </div>
+              {/* Legend — เฉพาะมือถือ (sm:hidden) — อธิบายว่ารหัส Sx คืออะไร */}
+              <details className="mt-4 sm:hidden">
+                <summary className="cursor-pointer text-xs font-medium text-gray-600">
+                  ดูคำอธิบายรหัสทักษะ
+                </summary>
+                <ul className="mt-2 space-y-1 border-t border-gray-100 pt-2 text-xs text-gray-600">
+                  {[...aggregate.by_skill]
+                    .sort((a, b) => b.count - a.count)
+                    .filter((s) => s.count > 0)
+                    .map((s) => (
+                      <li key={s.skill_id} className="flex items-baseline gap-2">
+                        <span className="shrink-0 font-mono font-medium text-gray-700">
+                          {s.skill_code}
+                        </span>
+                        <span className="text-gray-500">·</span>
+                        <span className="min-w-0">{s.skill_name}</span>
+                      </li>
+                    ))}
+                </ul>
+              </details>
+            </>
           )}
         </div>
       </section>
 
-      {/* Year selector — กรองเฉพาะ Active/History list ด้านล่าง (สถิติด้านบนคือทุกปีรวม) */}
-      <div className="mt-8 mb-3 flex flex-wrap items-end justify-between gap-3">
+      {/* Year selector + CSV — กรองเฉพาะ Active/History list ด้านล่าง (สถิติด้านบนคือทุกปีรวม)
+            CSV อยู่ติด year selector เพราะ export respect year filter
+            mobile: title row + (year selector + icon CSV) แถวล่าง — กระชับ
+            sm+:    title ซ้าย, controls ขวา (year dropdown + CSV button) */}
+      <div className="mb-3 mt-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 sm:mt-8">
         <div>
           <h2 className="text-base font-semibold text-gray-900">
             กิจกรรมที่สมัครและประวัติ
@@ -398,42 +412,72 @@ export default function StudentDashboardPage() {
             )}
           </p>
         </div>
-        <label className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm">
-          <Calendar className="h-4 w-4 text-gray-400" aria-hidden />
-          <span className="text-gray-600">ปีการศึกษา</span>
-          <select
-            value={academicYear ?? ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              setAcademicYear(v === 'all' ? 'all' : Number(v));
-            }}
-            disabled={availableYears.length === 0 && academicYear === null}
-            className="bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
-            aria-label="เลือกปีการศึกษา"
-          >
-            <option value="all">ทุกปีการศึกษา</option>
-            {/* fallback: ปี default ที่ยังไม่อยู่ใน availableYears */}
-            {availableYears.length === 0 &&
-              typeof academicYear === 'number' && (
-                <option value={academicYear}>{academicYear}</option>
-              )}
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2">
+          <label className="inline-flex h-10 flex-1 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm sm:h-auto sm:flex-none sm:py-1.5">
+            <Calendar className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
+            <span className="text-gray-600">ปีการศึกษา</span>
+            <select
+              value={academicYear ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                setAcademicYear(v === 'all' ? 'all' : Number(v));
+              }}
+              disabled={availableYears.length === 0 && academicYear === null}
+              className="flex-1 bg-transparent text-sm font-medium text-gray-900 focus:outline-none sm:flex-none"
+              aria-label="เลือกปีการศึกษา"
+            >
+              <option value="all">ทุกปีการศึกษา</option>
+              {/* fallback: ปี default ที่ยังไม่อยู่ใน availableYears */}
+              {availableYears.length === 0 &&
+                typeof academicYear === 'number' && (
+                  <option value={academicYear}>{academicYear}</option>
+                )}
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/* CSV button — secondary action; mobile = icon only (square 40x40), sm+ = icon+text
+                ส่ง csv ตาม academicYear ปัจจุบัน (number = ปีนั้น, 'all'/null = ทุกปี) */}
+          {user && (
+            <button
+              type="button"
+              onClick={() => {
+                const idLabel = user.msu_id || user.id;
+                const stamp = new Date().toISOString().slice(0, 10);
+                const specificYear =
+                  typeof academicYear === 'number' ? academicYear : null;
+                const url =
+                  specificYear !== null
+                    ? `/api/student/registrations.csv?academic_year=${specificYear}`
+                    : '/api/student/registrations.csv';
+                const yearSuffix = specificYear !== null ? `-${specificYear}` : '-all';
+                downloadAuthed(
+                  url,
+                  `my-activities-${idLabel}${yearSuffix}-${stamp}.csv`,
+                );
+              }}
+              title="ดาวน์โหลด CSV (ตามปีที่เลือก)"
+              aria-label="ดาวน์โหลด CSV"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              <span className="hidden text-sm font-medium sm:inline">CSV</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Active section: PENDING + REGISTERED */}
-      <section className="mb-10">
+      <section className="mb-8 sm:mb-10">
         <h3 className="mb-3 text-sm font-semibold text-gray-700">
           กิจกรรมที่สมัครไว้
         </h3>
         {!items && !error && <CardListSkeleton />}
         {activeItems && activeItems.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500 sm:p-8">
             <p>ยังไม่มีกิจกรรมที่สมัครไว้</p>
             <Link
               href="/"
@@ -444,7 +488,7 @@ export default function StudentDashboardPage() {
           </div>
         )}
         {activeItems && activeItems.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {activeItems.map((reg) => (
               <ActiveCard
                 key={reg.registration_id}
@@ -463,7 +507,7 @@ export default function StudentDashboardPage() {
         </h3>
         {!items && !error && <CardListSkeleton />}
         {historyItems && historyItems.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500 sm:p-8">
             ยังไม่มีประวัติการเข้าร่วม
           </div>
         )}
@@ -520,16 +564,16 @@ function StatTile({
     violet: 'bg-violet-100 text-violet-700',
   }[tone];
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-3">
+    <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="flex items-center gap-2.5 sm:gap-3">
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${toneClass}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 ${toneClass}`}
         >
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-gray-500">{label}</p>
-          <p className="mt-0.5 text-xl font-bold text-gray-900">
+          <p className="text-[11px] leading-tight text-gray-500 sm:text-xs">{label}</p>
+          <p className="mt-0.5 text-lg font-bold leading-tight text-gray-900 sm:text-xl">
             {value}
             <span className="ml-1 text-xs font-normal text-gray-500">
               {unit}
@@ -564,32 +608,57 @@ function ActiveCard({
   const canCancel = isPending;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
-      <div className="grid gap-5 md:grid-cols-[1fr_auto]">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
+      {/* mobile: QR อยู่บน (เห็นชัด ไม่ต้องเลื่อน), info อยู่ล่าง
+            md+ : info ซ้าย, QR ขวา (เลย์เอาท์เดิม) */}
+      <div className="grid gap-4 md:grid-cols-[1fr_auto] md:gap-5">
+        {/* QR (มาก่อนใน DOM order บน mobile เพื่อให้เห็นก่อน scroll) */}
+        <div className="order-first flex flex-col items-center justify-center md:order-last md:w-56">
+          {reg.qr_token ? (
+            <>
+              <QRCodeSVG
+                value={reg.qr_token}
+                size={160}
+                marginSize={2}
+                level="M"
+                className="h-auto w-full max-w-[200px] sm:max-w-[180px]"
+              />
+              <p className="mt-2 text-center font-mono text-[10px] text-gray-400">
+                {reg.qr_token.slice(0, 8)}…
+              </p>
+            </>
+          ) : (
+            <div className="flex h-36 w-36 flex-col items-center justify-center gap-1 rounded-lg bg-gray-100 p-3 text-center text-xs text-gray-500 sm:h-44 sm:w-44">
+              <span className="text-base">⏳</span>
+              <span>QR จะปรากฏ<br />หลังอนุมัติ</span>
+            </div>
+          )}
+        </div>
+
         <div className="min-w-0">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">
               {reg.category_name}
             </span>
             {isPending ? (
-              <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
                 รออนุมัติ
               </span>
             ) : (
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
                 อนุมัติเข้าร่วม
               </span>
             )}
             {/* แสดง participant_role เฉพาะถ้าไม่ใช่ default */}
             {reg.participant_role && reg.participant_role !== 'PARTICIPANT' && (
               <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${PARTICIPANT_ROLE_LABEL[reg.participant_role].tone}`}
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${PARTICIPANT_ROLE_LABEL[reg.participant_role].tone}`}
               >
                 {PARTICIPANT_ROLE_LABEL[reg.participant_role].short}
               </span>
             )}
           </div>
-          <h3 className="mb-1 text-base font-semibold text-gray-900">
+          <h3 className="mb-1 break-words text-base font-semibold leading-snug text-gray-900">
             {reg.title}
           </h3>
           <p className="text-xs text-gray-500">{reg.organization_name}</p>
@@ -597,11 +666,11 @@ function ActiveCard({
           <div className="mt-3 space-y-1.5 text-sm text-gray-700">
             <div className="flex items-start gap-1.5">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden />
-              <span>{reg.location || '—'}</span>
+              <span className="min-w-0 break-words">{reg.location || '—'}</span>
             </div>
             <div className="flex items-start gap-1.5">
               <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden />
-              <span>{formatActivityRange(reg.start_at, reg.end_at)}</span>
+              <span className="min-w-0">{formatActivityRange(reg.start_at, reg.end_at)}</span>
             </div>
             <div className="flex items-start gap-1.5">
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden />
@@ -618,36 +687,15 @@ function ActiveCard({
 
           {canCancel && (
             <div className="mt-4">
+              {/* mobile: full-width + h-10 (touch target ≥40px) / sm+: inline */}
               <button
                 type="button"
                 onClick={onAskCancel}
-                className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-sm font-medium text-rose-700 hover:bg-rose-50 sm:h-auto sm:w-auto sm:rounded-md sm:py-1.5 sm:text-xs"
               >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden />
                 ยกเลิกการสมัคร
               </button>
-            </div>
-          )}
-        </div>
-
-        {/* QR (เฉพาะ REGISTERED แล้วเท่านั้น) */}
-        <div className="flex flex-col items-center justify-center md:w-56">
-          {reg.qr_token ? (
-            <>
-              <QRCodeSVG
-                value={reg.qr_token}
-                size={176}
-                marginSize={2}
-                level="M"
-              />
-              <p className="mt-2 text-center font-mono text-[10px] text-gray-400">
-                {reg.qr_token.slice(0, 8)}…
-              </p>
-            </>
-          ) : (
-            <div className="flex h-44 w-44 flex-col items-center justify-center gap-1 rounded-lg bg-gray-100 p-3 text-center text-xs text-gray-500">
-              <span className="text-base">⏳</span>
-              <span>QR จะปรากฏ<br />หลังอนุมัติ</span>
             </div>
           )}
         </div>
@@ -694,9 +742,9 @@ function HistoryRow({ reg }: { reg: StudentRegistration }) {
     : null;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="min-w-0">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
+        <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">
             {reg.category_name}
           </span>
@@ -718,7 +766,7 @@ function HistoryRow({ reg }: { reg: StudentRegistration }) {
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${resultLabel.tone}`}
           >
-            ผลประเมิน: {resultLabel.text}
+            <span className="hidden sm:inline">ผลประเมิน: </span>{resultLabel.text}
           </span>
           {reg.participant_role && reg.participant_role !== 'PARTICIPANT' && (
             <span
@@ -728,7 +776,7 @@ function HistoryRow({ reg }: { reg: StudentRegistration }) {
             </span>
           )}
         </div>
-        <p className="truncate text-sm font-medium text-gray-900">
+        <p className="break-words text-sm font-medium leading-snug text-gray-900">
           {reg.title}
         </p>
         <p className="text-xs text-gray-500">
