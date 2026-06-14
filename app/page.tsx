@@ -182,11 +182,16 @@ export default function LandingPage() {
 
       {/* Hero + search */}
       <section className="mx-auto max-w-6xl px-6 pt-12 pb-6 text-center">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-4">
+        <div className=''>
+          <img src="/images/msu-logo-sm.png" className=''></img>
+        </div>
         <h1 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
           ระบบกิจกรรมนิสิต
           <br className="block" /> 
           <span className="text-blue-700 text-3xl md:text-4xl">มหาวิทยาลัยมหาสารคาม</span>
         </h1>
+        </div>
         <p className="mx-auto mb-6 max-w-2xl text-base text-gray-600 md:text-lg">
           ค้นหาและสมัครเข้าร่วมกิจกรรม เพื่อเก็บชั่วโมง และพัฒนาทักษะตามมาตรฐานมหาวิทยาลัย
         </p>
@@ -410,7 +415,8 @@ function CertCriteriaSection({
       : 'เข้าสู่ระบบเพื่อตรวจสถานะ';
 
   return (
-    <section className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 py-10 md:py-12">
+    // <section className="bg-gradient-to-b from-blue-100 via-slate-50 to-blue-100 py-10 md:py-12">
+    <section className="bg-blue-100/50 py-10 md:py-12">  
       <div className="mx-auto max-w-6xl px-6">
         {/* Header */}
         <div className="mb-6 text-center md:mb-8">
@@ -498,7 +504,7 @@ function CriteriaCard({
     emerald: 'bg-emerald-100 text-emerald-700',
   }[tone];
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/90 p-4 shadow-sm backdrop-blur-sm sm:p-5">
+    <div className="rounded-2xl border border-slate/60 bg-white/90 p-4 shadow-sm backdrop-blur-sm sm:p-5">
       <div className="mb-3 flex items-center gap-2">
         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${toneClass}`}>
           {icon}
