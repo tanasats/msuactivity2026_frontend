@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Award,
   ClipboardList,
+  FileText,
   GraduationCap,
   Home,
   LayoutDashboard,
@@ -52,6 +53,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'ค้นข้ามกิจกรรม',
     Icon: ListChecks,
     matchPrefix: '/dashboard/admin/registrations',
+  },
+  {
+    href: '/dashboard/admin/transcripts',
+    label: 'ทรานสคริปต์กิจกรรม',
+    Icon: FileText,
+    matchPrefix: '/dashboard/admin/transcripts',
   },
   {
     href: '/dashboard/admin/certificates',

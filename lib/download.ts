@@ -39,6 +39,34 @@ export async function downloadAuthed(url: string, fallbackFilename: string) {
   }
 }
 
+// เหมือน downloadAuthed แต่เป็น POST + ส่ง body (เช่น Word ที่รับ override จากฟอร์ม)
+export async function downloadAuthedPost(
+  url: string,
+  body: unknown,
+  fallbackFilename: string,
+) {
+  try {
+    const res = await api.post<Blob>(url, body, { responseType: 'blob' });
+    const ctRaw = res.headers['content-type'];
+    const contentType = typeof ctRaw === 'string' ? ctRaw : 'application/octet-stream';
+    const cdRaw = res.headers['content-disposition'];
+    const cd = typeof cdRaw === 'string' ? cdRaw : undefined;
+    const filename = parseFilename(cd) || fallbackFilename;
+
+    const blob = new Blob([res.data], { type: contentType });
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(blobUrl);
+  } catch {
+    toast.error('ดาวน์โหลดไม่สำเร็จ');
+  }
+}
+
 // parse Content-Disposition — รองรับทั้ง filename="..." และ filename*=UTF-8''<encoded>
 function parseFilename(header: string | undefined): string | null {
   if (!header) return null;

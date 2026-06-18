@@ -242,6 +242,74 @@ export interface AdminStudentDetail {
   registrations: AdminStudentRegistration[];
 }
 
+// ── ทรานสคริปต์กิจกรรม (ใบระเบียนกิจกรรมนิสิต) ────────────────────────────
+
+// (A) รายชื่อนิสิตที่เข้าร่วมครบตามเกณฑ์
+export interface EligibleStudent {
+  id: number;
+  msu_id: string | null;
+  full_name: string;
+  email: string;
+  faculty_name: string | null;
+  picture_url: string | null;
+  group_a_count: number;
+  group_b_count: number;
+  total_hours: number;
+  latest_cert_status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'ISSUED' | null;
+  latest_cert_requested_at: string | null;
+}
+
+export interface EligibleStudentsResponse {
+  items: EligibleStudent[];
+  total: number;
+  limit: number;
+  offset: number;
+  rule: {
+    group_a_prefixes: string[];
+    group_b_prefixes: string[];
+    group_a_min_activities: number;
+    group_b_min_activities: number;
+    min_total_hours: number;
+  };
+}
+
+// (B/C) ข้อมูลทรานสคริปต์รายบุคคล
+export interface TranscriptData {
+  header: {
+    id: number;
+    msu_id: string | null;
+    email: string;
+    full_name: string;
+    name_en_full: string | null;
+    prefix_en: string | null;
+    name_en: string | null;
+    surname_en: string | null;
+    faculty_name: string | null;
+    major_name: string | null;
+    degree_name: string | null;
+    admission_date: string | null;
+    picture_url: string | null;
+  };
+  years: {
+    academic_year: number;
+    activities: {
+      activity_id: number;
+      code: string | null;
+      title: string;
+      semester: number;
+      hours: number;
+      status_letter: 'A' | 'B' | 'C';
+      skills: string[];
+    }[];
+  }[];
+  summary: {
+    total_hours: number;
+    by_skill: { code: string; name: string; hours: number }[];
+    top_skill: { code: string; name: string; hours: number } | null;
+  };
+  org_leader_columns: string[];
+}
+
 // activity audit log entry
 export type ActivityAuditAction =
   | 'create'
