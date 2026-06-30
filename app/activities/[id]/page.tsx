@@ -207,7 +207,7 @@ export default function ActivityDetailPage() {
                 <img
                   src={activity.poster_url}
                   alt={activity.title}
-                  className="aspect-video w-full object-cover md:aspect-[21/9]"
+                  className="w-full h-auto object-cover"
                 />
               </div>
             )}

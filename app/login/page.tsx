@@ -55,9 +55,26 @@ export default function LoginPage() {
         <p className="mt-6 text-xs text-gray-400 text-center">
           ใช้บัญชีอีเมลของมหาวิทยาลัย <span className="font-mono">@msu.ac.th</span> เท่านั้น
         </p>
-        <div className='flex justify-between text-xs mt-4 text-blue-700'>
-        <Link href={'https://pdpa.msu.ac.th/privacy-policy'}>Privacy Policy</Link>  
-        <Link href={'https://portal.msu.ac.th'}>Help</Link>      
+
+        {/* PDPA — ประกาศการเก็บรวบรวมข้อมูลส่วนบุคคล (แจ้งตามมาตรา 23 พ.ร.บ. คุ้มครองข้อมูลฯ 2562) */}
+        <p className="mt-4 border-t border-gray-100 pt-4 text-center text-[11px] leading-relaxed text-gray-400">
+          เมื่อเข้าสู่ระบบ ถือว่าท่านรับทราบว่ามหาวิทยาลัยจะเก็บรวบรวมและใช้ข้อมูลส่วนบุคคลของท่าน
+          (ชื่อ-นามสกุล อีเมล รูปโปรไฟล์ และข้อมูลการเข้าร่วมกิจกรรม) เพื่อการบริหารจัดการกิจกรรมนิสิต
+          ตามมาตรา 23 แห่งพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 รายละเอียดเพิ่มเติมดูที่{' '}
+          <a
+            href="https://pdpa.msu.ac.th"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-blue-600 underline hover:text-blue-700"
+          >
+            นโยบายความเป็นส่วนตัวของมหาวิทยาลัย
+          </a>
+        </p>
+
+        <div className="mt-4 text-center text-xs text-blue-700">
+          <a href="https://portal.msu.ac.th" target="_blank" rel="noopener noreferrer">
+            ศูนย์ช่วยเหลือ
+          </a>
         </div>
       </div>
       <div className="pt-5 text-slate-500">

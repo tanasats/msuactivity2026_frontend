@@ -5,6 +5,8 @@ import Link from 'next/link';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   FileText,
   Loader2,
   Search,
@@ -19,6 +21,7 @@ import type {
 } from '@/lib/types';
 
 const PAGE_SIZE = 50;
+const NUMBER_FMT = new Intl.NumberFormat('th-TH');
 
 // label ของสถานะคำขอ transcript ล่าสุด (ถ้ามี)
 const CERT_STATUS: Record<string, { text: string; tone: string }> = {
@@ -87,8 +90,14 @@ export default function AdminTranscriptsPage() {
   const total = data?.total ?? null;
   const items = data?.items ?? null;
   const rule = data?.rule;
+
+  const totalPages = total && total > 0 ? Math.ceil(total / PAGE_SIZE) : 0;
+  const currentPage = totalPages > 0 ? Math.floor(offset / PAGE_SIZE) + 1 : 1;
+  const lastPageOffset = totalPages > 0 ? (totalPages - 1) * PAGE_SIZE : 0;
   const isFirst = offset === 0;
-  const isLast = total !== null && offset + PAGE_SIZE >= total;
+  const isLast = offset >= lastPageOffset;
+  const fromItem = total === 0 ? 0 : offset + 1;
+  const toItem = total !== null ? Math.min(offset + (items?.length ?? 0), total) : 0;
 
   return (
     <div className="mx-auto max-w-full p-6 md:p-8">
@@ -163,6 +172,23 @@ export default function AdminTranscriptsPage() {
         </select>
       </div>
 
+      {/* Pagination (top) */}
+      <PaginationBar
+        loading={loading}
+        total={total}
+        fromItem={fromItem}
+        toItem={toItem}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        isFirst={isFirst}
+        isLast={isLast}
+        onJump={(p) => setOffset((p - 1) * PAGE_SIZE)}
+        onFirst={() => setOffset(0)}
+        onPrev={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+        onNext={() => setOffset(offset + PAGE_SIZE)}
+        onLast={() => setOffset(lastPageOffset)}
+      />
+
       <div className="relative mt-2">
         {!items && !error && (
           <div className="space-y-2">
@@ -211,35 +237,156 @@ export default function AdminTranscriptsPage() {
         )}
       </div>
 
-      {/* Pagination */}
-      {total !== null && total > PAGE_SIZE && (
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 shadow-sm">
-          <span>
-            {formatNumber(offset + 1)}–{formatNumber(Math.min(offset + PAGE_SIZE, total))}{' '}
-            จาก {formatNumber(total)}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              disabled={isFirst || loading}
-              className="rounded-md border border-gray-300 bg-white p-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-              aria-label="ก่อนหน้า"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => setOffset(offset + PAGE_SIZE)}
-              disabled={isLast || loading}
-              className="rounded-md border border-gray-300 bg-white p-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-              aria-label="ถัดไป"
-            >
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          </div>
+      {/* Pagination (bottom) */}
+      {items && items.length > 0 && (
+        <div className="mt-3">
+          <PaginationBar
+            loading={loading}
+            total={total}
+            fromItem={fromItem}
+            toItem={toItem}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            isFirst={isFirst}
+            isLast={isLast}
+            onJump={(p) => setOffset((p - 1) * PAGE_SIZE)}
+            onFirst={() => setOffset(0)}
+            onPrev={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+            onNext={() => setOffset(offset + PAGE_SIZE)}
+            onLast={() => setOffset(lastPageOffset)}
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+// pagination bar เดียวกับหน้า /dashboard/admin/students (บน + ล่าง)
+function PaginationBar({
+  loading,
+  total,
+  fromItem,
+  toItem,
+  currentPage,
+  totalPages,
+  isFirst,
+  isLast,
+  onJump,
+  onFirst,
+  onPrev,
+  onNext,
+  onLast,
+}: {
+  loading: boolean;
+  total: number | null;
+  fromItem: number;
+  toItem: number;
+  currentPage: number;
+  totalPages: number;
+  isFirst: boolean;
+  isLast: boolean;
+  onJump: (page: number) => void;
+  onFirst: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onLast: () => void;
+}) {
+  const [pageInput, setPageInput] = useState('');
+  function jump() {
+    const p = Number(pageInput);
+    if (!Number.isInteger(p) || p < 1 || p > totalPages) return;
+    onJump(p);
+    setPageInput('');
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 shadow-sm">
+      <span>
+        {total === null
+          ? 'กำลังโหลด...'
+          : total === 0
+            ? '0 รายการ'
+            : (
+              <>
+                <span className="font-semibold text-gray-900">
+                  {NUMBER_FMT.format(fromItem)}–{NUMBER_FMT.format(toItem)}
+                </span>{' '}
+                จาก{' '}
+                <span className="font-semibold text-gray-900">
+                  {NUMBER_FMT.format(total)}
+                </span>
+              </>
+            )}
+      </span>
+      <div className="flex items-center gap-1">
+        {totalPages > 1 && (
+          <span className="mr-2 text-gray-500">
+            หน้า{' '}
+            <span className="font-semibold text-gray-900">
+              {NUMBER_FMT.format(currentPage)}
+            </span>{' '}
+            / {NUMBER_FMT.format(totalPages)}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={onFirst}
+          disabled={isFirst || loading}
+          className="rounded-md border border-gray-300 bg-white p-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          aria-label="หน้าแรก"
+        >
+          <ChevronsLeft className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={isFirst || loading}
+          className="rounded-md border border-gray-300 bg-white p-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          aria-label="ก่อนหน้า"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={isLast || loading}
+          className="rounded-md border border-gray-300 bg-white p-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          aria-label="ถัดไป"
+        >
+          <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={onLast}
+          disabled={isLast || loading}
+          className="rounded-md border border-gray-300 bg-white p-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          aria-label="หน้าสุดท้าย"
+        >
+          <ChevronsRight className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        {totalPages > 5 && (
+          <div className="ml-2 flex items-center gap-1">
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && jump()}
+              placeholder="ไป#"
+              aria-label="ไปยังหน้า"
+              className="w-14 rounded-md border border-gray-300 bg-white px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={jump}
+              disabled={!pageInput || loading}
+              className="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-40"
+            >
+              ไป
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

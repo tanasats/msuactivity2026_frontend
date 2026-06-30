@@ -530,6 +530,8 @@ export interface ActivitySummary {
   view_count?: number;
   interested_count?: number;
   poster_url?: string | null;
+  // คณะที่เปิดรับ — [] = เปิดรับทุกคณะ (public list/search ส่งมาเสมอ; summary อื่นอาจไม่มี)
+  eligible_faculties?: { id: number; code: string; name: string }[];
 }
 
 // student interest item — สำหรับ student dashboard "กิจกรรมที่ฉันสนใจ"

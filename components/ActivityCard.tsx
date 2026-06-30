@@ -1,7 +1,44 @@
 import Link from 'next/link';
-import { Calendar, Eye, Heart, ImageOff, MapPin } from 'lucide-react';
+import { Calendar, Eye, GraduationCap, Heart, ImageOff, MapPin, Users } from 'lucide-react';
 import type { ActivitySummary } from '@/lib/types';
 import { formatActivityRange, formatDate, formatNumber } from '@/lib/format';
+
+// chip บอกขอบเขตคณะที่เปิดรับ — อ่านจาก eligible_faculties ([] = ทุกคณะ)
+//   undefined = summary ไม่ส่ง field นี้มา (เช่น admin/faculty card) → ไม่แสดง
+//   length 0  → "ทุกคณะ" (เขียว — เปิดกว้าง)
+//   length 1  → "เฉพาะ <ชื่อคณะ>" (อำพัน — จำกัด)
+//   length >1 → "<n> คณะ" (อำพัน — จำกัดบางคณะ)
+function FacultyScopeChip({
+  faculties,
+}: {
+  faculties: ActivitySummary['eligible_faculties'];
+}) {
+  if (faculties === undefined) return null;
+  const isAll = faculties.length === 0;
+  const label = isAll
+    ? 'ทุกคณะ'
+    : faculties.length === 1
+      ? `เฉพาะ ${faculties[0].name}`
+      : `${faculties.length} คณะ`;
+  const title = isAll
+    ? 'เปิดรับทุกคณะ / สาขา'
+    : faculties.map((f) => `${f.code} — ${f.name}`).join('\n');
+  return (
+    <span
+      title={title}
+      className={`inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        isAll ? 'bg-green-100 text-green-800' : 'bg-indigo-100 text-indigo-800'
+      }`}
+    >
+      {isAll ? (
+        <Users className="h-3 w-3 shrink-0" aria-hidden />
+      ) : (
+        <GraduationCap className="h-3 w-3 shrink-0" aria-hidden />
+      )}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
 
 const CATEGORY_COLORS: Record<number, string> = {
   1: 'bg-blue-100 text-blue-800',
@@ -77,6 +114,7 @@ export function ActivityCard({ activity, variant = 'open' }: Props) {
               กยศ {activity.loan_hours} ชม.
             </span>
           )}
+          <FacultyScopeChip faculties={activity.eligible_faculties} />
         </div>
 
         <h3 className="mb-2 line-clamp-2 text-base font-semibold text-gray-900 group-hover:text-blue-700">
