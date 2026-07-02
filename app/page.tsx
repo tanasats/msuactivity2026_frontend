@@ -79,7 +79,7 @@ async function loadLandingData(): Promise<LandingData> {
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_SEARCH_LEN = 2;
 // จำนวนการ์ด preview ต่อ section บน landing — เกินนี้โชว์ลิงก์ "ดูทั้งหมด" ไปหน้า /activities
-const PREVIEW_COUNT = 6;
+const PREVIEW_COUNT = 20;
 
 export default function LandingPage() {
   const [data, setData] = useState<LandingData | null>(null);
@@ -154,166 +154,101 @@ export default function LandingPage() {
             - minHeight 300px: รับประกันความสูงขั้นต่ำของพื้นที่ภาพ */}
       <div
         className="w-full bg-cover bg-top bg-no-repeat"
-        // style={{
-        //   minHeight: '300px',
-        //   backgroundImage: "url('/images/activity-bg.png')",
-        // }}
+      // style={{
+      //   minHeight: '300px',
+      //   backgroundImage: "url('/images/activity-bg.png')",
+      // }}
       >
-      {/* Top bar */}
-      <header className="border-b border-gray-200 bg-white/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white font-bold">
-              M
+        {/* Top bar */}
+        <header className="border-b border-gray-200 bg-white/70 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white font-bold">
+                M
+              </div>
+              <span className="font-semibold text-gray-900">MSU Activity</span>
             </div>
-            <span className="font-semibold text-gray-900">MSU Activity</span>
+            {isBootstrapping ? (
+              <span
+                aria-hidden
+                className="h-8 w-28 animate-pulse rounded-lg bg-gray-100"
+              />
+            ) : user ? (
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+              >
+                <LayoutDashboard className="h-4 w-4" aria-hidden />
+                <span className="hidden sm:inline-block">กลับไปที่</span> Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                เข้าสู่ระบบ
+              </Link>
+            )}
           </div>
-          {isBootstrapping ? (
-            <span
-              aria-hidden
-              className="h-8 w-28 animate-pulse rounded-lg bg-gray-100"
-            />
-          ) : user ? (
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-            >
-              <LayoutDashboard className="h-4 w-4" aria-hidden />
-              <span className="hidden sm:inline-block">กลับไปที่</span> Dashboard
-            </Link>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              เข้าสู่ระบบ
-            </Link>
-          )}
-        </div>
-      </header>
+        </header>
 
-      {/* Hero + search */}
-      <section className="mx-auto max-w-6xl px-6 pt-12 pb-6 text-center">
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-4">
-        <div className=''>
-          <img src="/images/msu-logo-sm.png" className=''></img>
-        </div>
-        <h1 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
-          ระบบกิจกรรมนิสิต
-          <br className="block" /> 
-          <span className="text-blue-700 text-3xl md:text-4xl">มหาวิทยาลัยมหาสารคาม</span>
-        </h1>
-        </div>
-        <p className="mx-auto mb-6 max-w-2xl text-base text-gray-600 md:text-lg">
-          ค้นหาและสมัครเข้าร่วมกิจกรรม เพื่อเก็บชั่วโมง และพัฒนาทักษะตามมาตรฐานมหาวิทยาลัย
-        </p>
-        <div className="mx-auto max-w-xl">
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="ค้นหากิจกรรม (ชื่อ / รหัส / สถานที่ / หน่วยงาน)"
-              aria-label="ค้นหากิจกรรม"
-              className="w-full rounded-full border border-gray-300 bg-white py-3 pl-12 pr-12 text-base shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-            {/* spinner ระหว่าง debounce + searching */}
-            {(searching || (searchInput.trim() !== search && searchInput.length >= MIN_SEARCH_LEN)) && (
-              <Loader2
-                className="pointer-events-none absolute right-10 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400"
+        {/* Hero + search */}
+        <section className="mx-auto max-w-6xl px-6 pt-12 pb-6 text-center">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-4">
+            <div className=''>
+              <img src="/images/msu-logo-sm.png" className=''></img>
+            </div>
+            <h1 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
+              ระบบกิจกรรมนิสิต
+              <br className="block" />
+              <span className="text-blue-700 text-3xl md:text-4xl">มหาวิทยาลัยมหาสารคาม</span>
+            </h1>
+          </div>
+          <p className="mx-auto mb-6 max-w-2xl text-base text-gray-600 md:text-lg">
+            ค้นหาและสมัครเข้าร่วมกิจกรรม เพื่อเก็บชั่วโมง และพัฒนาทักษะตามมาตรฐานมหาวิทยาลัย
+          </p>
+          <div className="mx-auto max-w-xl">
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
                 aria-hidden
               />
-            )}
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => setSearchInput('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100"
-                aria-label="ล้างค่าค้นหา"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="ค้นหากิจกรรม (ชื่อ / รหัส / สถานที่ / หน่วยงาน)"
+                aria-label="ค้นหากิจกรรม"
+                className="w-full rounded-full border border-gray-300 bg-white py-3 pl-12 pr-12 text-base shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              {/* spinner ระหว่าง debounce + searching */}
+              {(searching || (searchInput.trim() !== search && searchInput.length >= MIN_SEARCH_LEN)) && (
+                <Loader2
+                  className="pointer-events-none absolute right-10 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400"
+                  aria-hidden
+                />
+              )}
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100"
+                  aria-label="ล้างค่าค้นหา"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {/* hint ตอนพิมพ์ตัวเดียว — บอกว่าต้องอย่างน้อย 2 ตัว */}
+            {searchInput.trim().length === 1 && (
+              <p className="mt-2 text-xs text-gray-400">
+                พิมพ์อย่างน้อย {MIN_SEARCH_LEN} ตัวอักษรเพื่อค้น
+              </p>
             )}
           </div>
-          {/* hint ตอนพิมพ์ตัวเดียว — บอกว่าต้องอย่างน้อย 2 ตัว */}
-          {searchInput.trim().length === 1 && (
-            <p className="mt-2 text-xs text-gray-400">
-              พิมพ์อย่างน้อย {MIN_SEARCH_LEN} ตัวอักษรเพื่อค้น
-            </p>
-          )}
-        </div>
-      </section>
+        </section>
       </div>
       {/* ── จบ hero banner area ── */}
-
-{/* Stats — 2 cards --ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
-{!isSearching && (
-      <>
-      <section className="mx-auto max-w-6xl px-6 py-6">
-        {error && (
-          <div className="mx-auto max-w-md rounded-lg bg-rose-50 p-4 text-center text-sm text-rose-700">
-            {error}
-          </div>
-        )}
-        {!data && !error && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[0, 1].map((i) => (
-              <div
-                key={i}
-                className="h-28 animate-pulse rounded-2xl border border-gray-200 bg-white"
-              />
-            ))}
-          </div>
-        )}
-        {data && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard
-              icon={<ClipboardList className="h-6 w-6" aria-hidden />}
-              label="จำนวนกิจกรรม"
-              value={formatNumber(data.stats.activities_count)}
-              hint="ที่ดำเนินการ + เสร็จสิ้นแล้ว (ทุกปีการศึกษา)"
-              tone="blue"
-            />
-            <StatCard
-              icon={<Users className="h-6 w-6" aria-hidden />}
-              label="จำนวนผู้ใช้งาน"
-              value={formatNumber(data.stats.members_count)}
-              hint="บัญชีที่เปิดใช้งาน"
-              tone="emerald"
-            />
-          </div>
-        )}
-      </section>
-      </>
-)}
-
-
-      {/* Transcript criteria — กระตุ้นนิสิตให้รู้เป้าหมาย / ดู progress ตัวเอง
-            ซ่อนตอน searching เพื่อให้ focus ผลค้นหา */}
-      {!isSearching && data?.certRule && (
-        <CertCriteriaSection rule={data.certRule} user={user} />
-      )}
-
-      {/* Open + Upcoming — ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
-      {!isSearching && (
-      <>
-      <div className="hidden sm:block">
-        {/* Charts — by year / by category / by skill (3 horizontal bars, blue tone) */}
-        {data && (
-          <section className="mx-auto grid max-w-6xl gap-5 px-6 py-6 lg:grid-cols-3">
-            <ByYearChart data={data.stats.by_year} />
-            <ByCategoryChart data={data.stats.by_category} />
-            <BySkillChart data={data.stats.by_skill} />
-          </section>
-        )}
-      </div>
-      </>
-      )}
-
 
       {/* Search results — โชว์เฉพาะตอน searching (q ≥ 2 ตัว); แทนที่ open+upcoming */}
       {isSearching && (
@@ -399,6 +334,72 @@ export default function LandingPage() {
         </>
       )}
 
+
+
+      {/* Transcript criteria — กระตุ้นนิสิตให้รู้เป้าหมาย / ดู progress ตัวเอง
+            ซ่อนตอน searching เพื่อให้ focus ผลค้นหา */}
+      {!isSearching && data?.certRule && (
+        <CertCriteriaSection rule={data.certRule} user={user} />
+      )}
+
+
+      {/* Stats — 2 cards --ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
+      {!isSearching && (
+        <>
+          <section className="mx-auto max-w-6xl px-6 py-6">
+            {error && (
+              <div className="mx-auto max-w-md rounded-lg bg-rose-50 p-4 text-center text-sm text-rose-700">
+                {error}
+              </div>
+            )}
+            {!data && !error && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[0, 1].map((i) => (
+                  <div
+                    key={i}
+                    className="h-28 animate-pulse rounded-2xl border border-gray-200 bg-white"
+                  />
+                ))}
+              </div>
+            )}
+            {data && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <StatCard
+                  icon={<ClipboardList className="h-6 w-6" aria-hidden />}
+                  label="จำนวนกิจกรรม"
+                  value={formatNumber(data.stats.activities_count)}
+                  hint="ที่ดำเนินการ + เสร็จสิ้นแล้ว (ทุกปีการศึกษา)"
+                  tone="blue"
+                />
+                <StatCard
+                  icon={<Users className="h-6 w-6" aria-hidden />}
+                  label="จำนวนผู้ใช้งาน"
+                  value={formatNumber(data.stats.members_count)}
+                  hint="บัญชีที่เปิดใช้งาน"
+                  tone="emerald"
+                />
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {/* Open + Upcoming — ซ่อนเมื่อ searching เพื่อให้ focus ที่ผลค้นหา */}
+      {!isSearching && (
+        <>
+          <div className="hidden sm:block">
+            {/* Charts — by year / by category / by skill (3 horizontal bars, blue tone) */}
+            {data && (
+              <section className="mx-auto grid max-w-6xl gap-5 px-6 py-6 lg:grid-cols-3">
+                <ByYearChart data={data.stats.by_year} />
+                <ByCategoryChart data={data.stats.by_category} />
+                <BySkillChart data={data.stats.by_skill} />
+              </section>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Footer */}
       <footer className="mt-12 border-t border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-6 text-center text-sm text-gray-500">
@@ -435,7 +436,7 @@ function CertCriteriaSection({
 
   return (
     // <section className="bg-gradient-to-b from-blue-100 via-slate-50 to-blue-100 py-10 md:py-12">
-    <section className="bg-blue-100/50 py-10 md:py-12">  
+    <section className="bg-blue-100/50 py-10 md:py-12">
       <div className="mx-auto max-w-6xl px-6">
         {/* Header */}
         <div className="mb-6 text-center md:mb-8">
