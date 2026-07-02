@@ -51,10 +51,10 @@ async function loadLandingData(): Promise<LandingData> {
   const [statsRes, openRes, upcomingRes, certRuleRes] = await Promise.all([
     publicApi.get<LandingStats>('/api/public/landing-stats'),
     publicApi.get<PublicActivityListResponse>('/api/public/activities', {
-      params: { filter: 'open', limit: 12 },
+      params: { filter: 'open', limit: PREVIEW_COUNT },
     }),
     publicApi.get<PublicActivityListResponse>('/api/public/activities', {
-      params: { filter: 'upcoming', limit: 18 },
+      params: { filter: 'upcoming', limit: PREVIEW_COUNT },
     }),
     // cert rule — best-effort (404 ถ้ายังไม่ตั้งเกณฑ์ → section ซ่อนเอง)
     publicApi
@@ -65,7 +65,7 @@ async function loadLandingData(): Promise<LandingData> {
   const openIds = new Set(openRes.data.items.map((a) => a.id));
   const upcomingDeduped = upcomingRes.data.items
     .filter((a) => !openIds.has(a.id))
-    .slice(0, 12);
+    .slice(0, PREVIEW_COUNT);
   return {
     stats: statsRes.data,
     open: openRes.data.items,
