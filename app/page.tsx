@@ -15,7 +15,13 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
-import type { ActivitySummary, LandingStats, PublicCertRequirement, User } from '@/lib/types';
+import type {
+  ActivitySummary,
+  LandingStats,
+  PublicActivityListResponse,
+  PublicCertRequirement,
+  User,
+} from '@/lib/types';
 import { formatNumber } from '@/lib/format';
 import { ActivityCard } from '@/components/ActivityCard';
 import {
@@ -35,17 +41,19 @@ const publicApi = axios.create({ baseURL: API_BASE, timeout: 10000 });
 interface LandingData {
   stats: LandingStats;
   open: ActivitySummary[];
+  openTotal: number;       // จำนวนกิจกรรมที่เปิดรับสมัครทั้งหมด (ไม่จำกัด preview)
   upcoming: ActivitySummary[];
+  upcomingTotal: number;   // จำนวนกิจกรรมที่กำลังจะเปิดรับสมัครทั้งหมด
   certRule: PublicCertRequirement | null;  // null = ระบบยังไม่ตั้งเกณฑ์ (rare)
 }
 
 async function loadLandingData(): Promise<LandingData> {
   const [statsRes, openRes, upcomingRes, certRuleRes] = await Promise.all([
     publicApi.get<LandingStats>('/api/public/landing-stats'),
-    publicApi.get<{ items: ActivitySummary[] }>('/api/public/activities', {
+    publicApi.get<PublicActivityListResponse>('/api/public/activities', {
       params: { filter: 'open', limit: 12 },
     }),
-    publicApi.get<{ items: ActivitySummary[] }>('/api/public/activities', {
+    publicApi.get<PublicActivityListResponse>('/api/public/activities', {
       params: { filter: 'upcoming', limit: 18 },
     }),
     // cert rule — best-effort (404 ถ้ายังไม่ตั้งเกณฑ์ → section ซ่อนเอง)
@@ -61,13 +69,17 @@ async function loadLandingData(): Promise<LandingData> {
   return {
     stats: statsRes.data,
     open: openRes.data.items,
+    openTotal: openRes.data.total,
     upcoming: upcomingDeduped,
+    upcomingTotal: upcomingRes.data.total,
     certRule: certRuleRes?.data ?? null,
   };
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_SEARCH_LEN = 2;
+// จำนวนการ์ด preview ต่อ section บน landing — เกินนี้โชว์ลิงก์ "ดูทั้งหมด" ไปหน้า /activities
+const PREVIEW_COUNT = 6;
 
 export default function LandingPage() {
   const [data, setData] = useState<LandingData | null>(null);
@@ -346,14 +358,19 @@ export default function LandingPage() {
       {!isSearching && (
         <>
           <section id="open-activities" className="mx-auto max-w-6xl px-6 py-10">
-            <SectionHeader title="กำลังเปิดรับสมัคร" subtitle="สมัครได้ตอนนี้" />
+            <SectionHeader
+              title="กำลังเปิดรับสมัคร"
+              subtitle="สมัครได้ตอนนี้"
+              count={data?.openTotal}
+              viewAllHref="/activities?filter=open"
+            />
             {!data && !error && <CardSkeletonGrid />}
             {data && data.open.length === 0 && (
               <EmptyState message="ขณะนี้ยังไม่มีกิจกรรมที่เปิดรับสมัคร" />
             )}
             {data && data.open.length > 0 && (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {data.open.slice(0, 6).map((a) => (
+                {data.open.slice(0, PREVIEW_COUNT).map((a) => (
                   <ActivityCard key={a.id} activity={a} variant="open" />
                 ))}
               </div>
@@ -364,6 +381,8 @@ export default function LandingPage() {
             <SectionHeader
               title="กิจกรรมที่กำลังจะเปิดรับสมัคร"
               subtitle="ยังไม่เริ่ม / ยังไม่เปิดรับสมัคร"
+              count={data?.upcomingTotal}
+              viewAllHref="/activities?filter=upcoming"
             />
             {!data && !error && <CardSkeletonGrid />}
             {data && data.upcoming.length === 0 && (
@@ -371,7 +390,7 @@ export default function LandingPage() {
             )}
             {data && data.upcoming.length > 0 && (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {data.upcoming.slice(0, 6).map((a) => (
+                {data.upcoming.slice(0, PREVIEW_COUNT).map((a) => (
                   <ActivityCard key={a.id} activity={a} variant="upcoming" />
                 ))}
               </div>
@@ -708,14 +727,37 @@ function BySkillChart({ data }: { data: LandingStats['by_skill'] }) {
 function SectionHeader({
   title,
   subtitle,
+  count,
+  viewAllHref,
 }: {
   title: string;
   subtitle?: string;
+  count?: number;            // จำนวนทั้งหมด — โชว์เป็น badge ข้างชื่อ
+  viewAllHref?: string;      // ปลายทางลิงก์ "ดูทั้งหมด" (โชว์เมื่อ count > PREVIEW_COUNT)
 }) {
+  const showViewAll =
+    viewAllHref !== undefined && count !== undefined && count > PREVIEW_COUNT;
   return (
-    <div className="mb-5">
-      <h2 className="text-xl font-bold text-gray-900 md:text-2xl">{title}</h2>
-      {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+    <div className="mb-5 flex items-end justify-between gap-4">
+      <div>
+        <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+          {title}
+          {count !== undefined && (
+            <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-semibold text-blue-700">
+              {formatNumber(count)}
+            </span>
+          )}
+        </h2>
+        {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+      </div>
+      {showViewAll && (
+        <Link
+          href={viewAllHref}
+          className="shrink-0 whitespace-nowrap text-sm font-medium text-blue-700 hover:underline"
+        >
+          ดูทั้งหมด →
+        </Link>
+      )}
     </div>
   );
 }

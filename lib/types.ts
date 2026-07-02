@@ -534,6 +534,15 @@ export interface ActivitySummary {
   eligible_faculties?: { id: number; code: string; name: string }[];
 }
 
+// response ของ GET /api/public/activities — items + total (นับทั้งหมดที่ตรง filter)
+export interface PublicActivityListResponse {
+  items: ActivitySummary[];
+  filter: 'open' | 'upcoming' | null;
+  limit: number;
+  offset: number;
+  total: number;
+}
+
 // student interest item — สำหรับ student dashboard "กิจกรรมที่ฉันสนใจ"
 export interface StudentInterestActivity {
   activity_id: number;
