@@ -24,6 +24,7 @@ import type {
 } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
 import { ActivityCard } from '@/components/ActivityCard';
+import { ActivityCalendar } from '@/components/ActivityCalendar';
 import {
   CHART_CARD,
   ChartHeader,
@@ -286,6 +287,13 @@ export default function LandingPage() {
               })}
             </div>
           )}
+        </section>
+      )}
+
+      {/* ปฏิทินกิจกรรม — ภาพรวมกิจกรรมรายเดือน (ซ่อนตอน searching) */}
+      {!isSearching && (
+        <section className="mx-auto max-w-6xl px-6 py-10">
+          <ActivityCalendar />
         </section>
       )}
 

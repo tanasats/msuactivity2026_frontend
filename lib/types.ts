@@ -543,6 +543,27 @@ export interface PublicActivityListResponse {
   total: number;
 }
 
+// รายการกิจกรรมแบบเบาสำหรับปฏิทิน landing (GET /api/public/activities/calendar)
+export interface CalendarActivity {
+  id: number;
+  code: string | null;
+  title: string;
+  start_at: string;
+  end_at: string;
+  capacity: number;
+  registered_count: number;
+  registration_open_at: string;
+  registration_close_at: string;
+  category_code: number;
+  category_name: string;
+  eligible_faculties: { id: number; code: string; name: string }[]; // [] = ทุกคณะ
+}
+export interface CalendarResponse {
+  items: CalendarActivity[];
+  from: string;
+  to: string;
+}
+
 // student interest item — สำหรับ student dashboard "กิจกรรมที่ฉันสนใจ"
 export interface StudentInterestActivity {
   activity_id: number;
