@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store';
 import { useAuthBootstrap } from '@/lib/auth-bootstrap';
 import { Sidebar } from '@/components/faculty/Sidebar';
 import { MobileTopbar } from '@/components/faculty/MobileTopbar';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // auth guard ของ faculty section: ต้อง login + role faculty_staff (admin/super_admin เข้าได้ด้วย)
 //
@@ -49,6 +50,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
     <div className="min-h-screen bg-gray-50">
       <MobileTopbar onMenuClick={() => setDrawerOpen(true)} />
       <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <NotificationBell />
       <div className="pt-14 md:pl-60 md:pt-0">{children}</div>
     </div>
   );

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store';
 import { useAuthBootstrap } from '@/lib/auth-bootstrap';
 import { Sidebar } from '@/components/student/Sidebar';
 import { MobileTopbar } from '@/components/student/MobileTopbar';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // Layout shell ของ student section — โครงสร้างเดียวกับ faculty layout
 //   desktop (≥ md): sidebar fixed ซ้าย กว้าง 60 — content เริ่ม pl-60
@@ -47,6 +48,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     <div className="min-h-screen bg-gray-50">
       <MobileTopbar onMenuClick={() => setDrawerOpen(true)} />
       <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <NotificationBell />
       <div className="pt-14 md:pl-60 md:pt-0">{children}</div>
     </div>
   );

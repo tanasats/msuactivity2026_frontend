@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store';
 import { useAuthBootstrap } from '@/lib/auth-bootstrap';
 import { Sidebar } from '@/components/super-admin/Sidebar';
 import { MobileTopbar } from '@/components/super-admin/MobileTopbar';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // auth guard: ต้อง login + role super_admin เท่านั้น
 //   admin (ทั่วไป) ไม่เข้าหน้านี้ — จะถูก redirect กลับ /dashboard
@@ -49,6 +50,7 @@ export default function SuperAdminLayout({
     <div className="min-h-screen bg-gray-50">
       <MobileTopbar onMenuClick={() => setDrawerOpen(true)} />
       <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <NotificationBell />
       <div className="pt-14 md:pl-60 md:pt-0">{children}</div>
     </div>
   );

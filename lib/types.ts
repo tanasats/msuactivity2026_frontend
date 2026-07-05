@@ -543,6 +543,42 @@ export interface PublicActivityListResponse {
   total: number;
 }
 
+// การแจ้งเตือน in-app (GET /api/me/notifications)
+export interface AppNotification {
+  id: number;
+  event_type: string;
+  category: string;
+  title: string;
+  body: string | null;
+  link_url: string | null;
+  related_activity_id: number | null;
+  related_registration_id: number | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+export interface NotificationListResponse {
+  items: AppNotification[];
+  unread_count: number;
+}
+
+// preference เมทริกซ์ หมวด × ช่องทาง (GET /api/me/notification-preferences)
+export interface NotificationChannelMeta {
+  key: string; // 'in_app' | 'email'
+  label: string;
+  enabled: boolean; // เปิดใช้ระดับระบบ (email = false ในเฟสนี้)
+}
+export interface NotificationCategoryPref {
+  key: string;
+  label: string;
+  values: Record<string, boolean>; // { in_app: true, email: false }
+}
+export interface NotificationPreferences {
+  channels_meta: NotificationChannelMeta[];
+  master: Record<string, boolean>;
+  categories: NotificationCategoryPref[];
+}
+
 // รายการกิจกรรมแบบเบาสำหรับปฏิทิน landing (GET /api/public/activities/calendar)
 export interface CalendarActivity {
   id: number;
