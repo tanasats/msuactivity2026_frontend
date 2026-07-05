@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bell, Check, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Bell, Check, Loader2, Mail, Save, Send } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { useAuthBootstrap } from '@/lib/auth-bootstrap';
@@ -27,6 +27,12 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // D3 — ส่งเมลทดสอบ (เฉพาะ admin/super_admin)
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const [testTo, setTestTo] = useState('');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   // auth guard
   useEffect(() => {
@@ -76,6 +82,32 @@ export default function NotificationSettingsPage() {
       setError('บันทึกไม่สำเร็จ — ลองใหม่');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSendTest() {
+    setTestSending(true);
+    setTestResult(null);
+    try {
+      const body = testTo.trim() ? { to: testTo.trim() } : {};
+      const res = await api.post<{ to: string; redirected_to: string | null }>(
+        '/api/admin/email/test',
+        body,
+      );
+      const { to, redirected_to } = res.data;
+      setTestResult({
+        ok: true,
+        msg: redirected_to
+          ? `ส่งแล้ว — แต่ DEV redirect ไปที่ ${redirected_to} (ปลายทางจริง: ${to})`
+          : `ส่งเมลทดสอบไป ${to} แล้ว`,
+      });
+    } catch (e) {
+      const msg =
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'ส่งไม่สำเร็จ';
+      setTestResult({ ok: false, msg });
+    } finally {
+      setTestSending(false);
     }
   }
 
@@ -197,6 +229,50 @@ export default function NotificationSettingsPage() {
           )}
           {error && <span className="text-sm text-rose-600">{error}</span>}
         </div>
+
+        {/* D3 — ส่งเมลทดสอบ (เฉพาะ admin) */}
+        {isAdmin && (
+          <div className="mt-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <Mail className="h-4 w-4 text-blue-600" aria-hidden />
+              ทดสอบระบบส่งอีเมล (สำหรับผู้ดูแล)
+            </h2>
+            <p className="mt-1 text-xs text-gray-500">
+              ตรวจการเชื่อมต่อ SMTP + ส่งเมลจริง 1 ฉบับ — เว้นว่างเพื่อส่งหาอีเมลของคุณเอง
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="email"
+                value={testTo}
+                onChange={(e) => setTestTo(e.target.value)}
+                placeholder="อีเมลผู้รับ (ไม่บังคับ)"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              <button
+                type="button"
+                onClick={handleSendTest}
+                disabled={testSending}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-900 disabled:opacity-60"
+              >
+                {testSending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Send className="h-4 w-4" aria-hidden />
+                )}
+                ส่งเมลทดสอบ
+              </button>
+            </div>
+            {testResult && (
+              <p
+                className={`mt-2 text-sm ${
+                  testResult.ok ? 'text-emerald-600' : 'text-rose-600'
+                }`}
+              >
+                {testResult.msg}
+              </p>
+            )}
+          </div>
+        )}
       </section>
     </main>
   );
