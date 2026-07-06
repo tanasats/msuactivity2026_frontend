@@ -188,6 +188,18 @@ export default function NotificationSettingsPage() {
                   <tr key={c.key}>
                     <td className="px-4 py-3 text-gray-800">{c.label}</td>
                     {channels.map((ch) => {
+                      // หมวดนี้ไม่รองรับช่องทางนี้ (เช่น ประกาศ = in-app เท่านั้น) → ไม่แสดง toggle
+                      if (!c.channels.includes(ch.key)) {
+                        return (
+                          <td
+                            key={ch.key}
+                            className="px-2 py-3 text-center text-gray-300"
+                            title="ไม่รองรับช่องทางนี้"
+                          >
+                            —
+                          </td>
+                        );
+                      }
                       const colOff = !ch.enabled || !master[ch.key];
                       return (
                         <td key={ch.key} className="px-2 py-3 text-center">

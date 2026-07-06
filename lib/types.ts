@@ -146,6 +146,8 @@ export interface AdminAnnouncement extends PublicAnnouncement {
   starts_at: string | null;
   ends_at: string | null;
   is_active: boolean;
+  audience_roles: string[] | null; // null = ทุก role
+  audience_faculty_ids: number[] | null; // null = ทุกคณะ
   created_by: number;
   created_by_name: string;
   updated_by: number | null;
@@ -544,7 +546,9 @@ export interface PublicActivityListResponse {
 }
 
 // การแจ้งเตือน in-app (GET /api/me/notifications)
+//   source: 'personal' = notification ส่วนตัว · 'announcement' = ประกาศ broadcast (read-state แยก)
 export interface AppNotification {
+  source: 'personal' | 'announcement';
   id: number;
   event_type: string;
   category: string;
@@ -571,12 +575,49 @@ export interface NotificationChannelMeta {
 export interface NotificationCategoryPref {
   key: string;
   label: string;
+  channels: string[]; // ช่องทางที่หมวดนี้ส่งได้จริง (เช่น announcement = ['in_app'])
   values: Record<string, boolean>; // { in_app: true, email: false }
 }
 export interface NotificationPreferences {
   channels_meta: NotificationChannelMeta[];
   master: Record<string, boolean>;
   categories: NotificationCategoryPref[];
+}
+
+// ── ข้อความสองทาง faculty ↔ admin ────────────────────────────────
+export interface MessageThreadSummary {
+  id: number;
+  subject: string;
+  status: 'OPEN' | 'RESOLVED';
+  last_message_at: string;
+  created_at: string;
+  unread: boolean;
+  // เฉพาะ admin inbox:
+  created_by?: number;
+  creator_name?: string;
+  creator_faculty?: string | null;
+}
+export interface ThreadMessage {
+  id: number;
+  sender_id: number;
+  body: string;
+  created_at: string;
+  sender_name: string;
+  sender_role: string;
+}
+export interface MessageThreadDetail {
+  thread: {
+    id: number;
+    subject: string;
+    status: 'OPEN' | 'RESOLVED';
+    created_by: number;
+    creator_name: string;
+    creator_faculty: string | null;
+    last_message_at: string;
+    created_at: string;
+    resolved_at: string | null;
+  };
+  messages: ThreadMessage[];
 }
 
 // รายการกิจกรรมแบบเบาสำหรับปฏิทิน landing (GET /api/public/activities/calendar)

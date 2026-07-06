@@ -7,6 +7,7 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -33,6 +34,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'กิจกรรม',
     Icon: ClipboardList,
     matchPrefix: '/dashboard/faculty/activities',
+  },
+  {
+    href: '/dashboard/faculty/messages',
+    label: 'ติดต่อผู้ดูแล',
+    Icon: MessageCircle,
+    matchPrefix: '/dashboard/faculty/messages',
   },
 ];
 

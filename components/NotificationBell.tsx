@@ -73,9 +73,18 @@ export function NotificationBell() {
 
   async function handleItemClick(n: AppNotification) {
     if (!n.is_read) {
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
+      // match ด้วย source+id (personal/announcement มี id ชุดแยกกัน อาจซ้ำเลข)
+      setItems((prev) =>
+        prev.map((x) =>
+          x.source === n.source && x.id === n.id ? { ...x, is_read: true } : x,
+        ),
+      );
       setUnread((c) => Math.max(0, c - 1));
-      api.post(`/api/me/notifications/${n.id}/read`).catch(() => {});
+      const url =
+        n.source === 'announcement'
+          ? `/api/me/announcements/${n.id}/read`
+          : `/api/me/notifications/${n.id}/read`;
+      api.post(url).catch(() => {});
     }
     setOpen(false);
     if (n.link_url) router.push(n.link_url);
@@ -135,7 +144,7 @@ export function NotificationBell() {
             ) : (
               <ul className="divide-y divide-gray-50">
                 {items.map((n) => (
-                  <li key={n.id}>
+                  <li key={`${n.source}-${n.id}`}>
                     <button
                       type="button"
                       onClick={() => handleItemClick(n)}
@@ -150,8 +159,15 @@ export function NotificationBell() {
                         aria-hidden
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-gray-900">
-                          {n.title}
+                        <span className="flex items-center gap-1.5">
+                          {n.category === 'admin_message' && (
+                            <span className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                              ผู้ดูแล
+                            </span>
+                          )}
+                          <span className="block text-sm font-medium text-gray-900">
+                            {n.title}
+                          </span>
                         </span>
                         {n.body && (
                           <span className="mt-0.5 line-clamp-2 block text-xs text-gray-600">
@@ -169,14 +185,21 @@ export function NotificationBell() {
             )}
           </div>
 
-          <div className="border-t border-gray-100 px-4 py-2 text-center">
+          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2">
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="text-xs font-medium text-blue-600 hover:underline"
+            >
+              ดูทั้งหมด
+            </Link>
             <Link
               href="/settings/notifications"
               onClick={() => setOpen(false)}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
             >
               <Settings className="h-3.5 w-3.5" aria-hidden />
-              ตั้งค่าการแจ้งเตือน
+              ตั้งค่า
             </Link>
           </div>
         </div>

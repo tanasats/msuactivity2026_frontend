@@ -46,6 +46,8 @@ interface FormValue {
   starts_at: string; // datetime-local string ('' = null)
   ends_at: string;
   is_active: boolean;
+  audience_roles: string[]; // [] = ทุก role
+  audience_faculty_ids: number[]; // [] = ทุกคณะ
 }
 
 const EMPTY_FORM: FormValue = {
@@ -58,7 +60,19 @@ const EMPTY_FORM: FormValue = {
   starts_at: '',
   ends_at: '',
   is_active: true,
+  audience_roles: [],
+  audience_faculty_ids: [],
 };
+
+// role ที่เลือกเป็นกลุ่มเป้าหมายได้
+const AUDIENCE_ROLES: { key: string; label: string }[] = [
+  { key: 'student', label: 'นิสิต' },
+  { key: 'faculty_staff', label: 'เจ้าหน้าที่คณะ' },
+  { key: 'executive', label: 'ผู้บริหาร' },
+  { key: 'admin', label: 'admin' },
+  { key: 'super_admin', label: 'super admin' },
+  { key: 'staff', label: 'staff' },
+];
 
 // helpers — แปลง ISO ↔ datetime-local input format (YYYY-MM-DDTHH:mm)
 function isoToLocal(iso: string | null): string {
@@ -348,15 +362,43 @@ function FormDialog({
       starts_at: isoToLocal(existing.starts_at),
       ends_at: isoToLocal(existing.ends_at),
       is_active: existing.is_active,
+      audience_roles: existing.audience_roles ?? [],
+      audience_faculty_ids: existing.audience_faculty_ids ?? [],
     };
   }, [existing]);
 
   const [v, setV] = useState<FormValue>(initial);
   const [saving, setSaving] = useState(false);
+  const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
+
+  useEffect(() => {
+    api
+      .get<{ items: { id: number; name: string }[] }>('/api/faculties?is_active=true')
+      .then((r) => setFaculties(r.data.items))
+      .catch(() => {});
+  }, []);
 
   function setField<K extends keyof FormValue>(k: K, val: FormValue[K]) {
     setV((prev) => ({ ...prev, [k]: val }));
   }
+  const toggleRole = (r: string) =>
+    setV((p) => ({
+      ...p,
+      audience_roles: p.audience_roles.includes(r)
+        ? p.audience_roles.filter((x) => x !== r)
+        : [...p.audience_roles, r],
+    }));
+  const toggleFaculty = (id: number) =>
+    setV((p) => ({
+      ...p,
+      audience_faculty_ids: p.audience_faculty_ids.includes(id)
+        ? p.audience_faculty_ids.filter((x) => x !== id)
+        : [...p.audience_faculty_ids, id],
+    }));
+  const chipCls = (on: boolean) =>
+    `rounded-full px-2.5 py-0.5 text-xs font-medium transition ${
+      on ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+    }`;
 
   async function save() {
     if (!v.body.trim()) {
@@ -375,6 +417,9 @@ function FormDialog({
         starts_at: localToIso(v.starts_at),
         ends_at: localToIso(v.ends_at),
         is_active: v.is_active,
+        // [] = ทุกคน → ส่ง null
+        audience_roles: v.audience_roles.length ? v.audience_roles : null,
+        audience_faculty_ids: v.audience_faculty_ids.length ? v.audience_faculty_ids : null,
       };
       if (existing) {
         await api.patch(`/api/admin/announcements/${existing.id}`, payload);
@@ -540,6 +585,44 @@ function FormDialog({
             />
             เปิดใช้งาน (uncheck = บันทึกเป็นแบบปิดไว้ก่อน)
           </label>
+
+          {/* targeting — กลุ่มผู้รับ */}
+          <div className="rounded-lg border border-gray-200 p-3">
+            <p className="text-xs font-semibold text-gray-700">กลุ่มผู้รับ (ในกระดิ่งแจ้งเตือน)</p>
+            <p className="mb-2 text-[11px] text-gray-400">
+              ไม่เลือก = ทุกคน · เลือกบางอย่าง = เฉพาะที่ตรงทั้ง role และคณะ
+            </p>
+            <p className="mb-1 text-xs text-gray-600">บทบาท</p>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {AUDIENCE_ROLES.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => toggleRole(r.key)}
+                  className={chipCls(v.audience_roles.includes(r.key))}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <p className="mb-1 text-xs text-gray-600">คณะ</p>
+            <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto rounded border border-gray-100 p-1.5">
+              {faculties.length === 0 ? (
+                <span className="text-xs text-gray-400">กำลังโหลด...</span>
+              ) : (
+                faculties.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => toggleFaculty(f.id)}
+                    className={chipCls(v.audience_faculty_ids.includes(f.id))}
+                  >
+                    {f.name}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3">

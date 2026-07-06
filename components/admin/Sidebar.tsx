@@ -11,7 +11,9 @@ import {
   LayoutDashboard,
   ListChecks,
   Megaphone,
+  Inbox,
   ScrollText,
+  Send,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -26,6 +28,8 @@ interface NavItem {
   matchPrefix?: string;
   // ถ้ามี → ต้อง role ตรง 1 ใน list ถึงโชว์ (เช่น cert rule editor = super_admin only)
   requireRole?: UserRole[];
+  // หัวข้อกลุ่มในเมนู (แสดง heading เมื่อกลุ่มเปลี่ยน)
+  section?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -73,11 +77,27 @@ const NAV_ITEMS: NavItem[] = [
     matchPrefix: '/dashboard/admin/cert-requirements',
     requireRole: ['super_admin'],
   },
+  // ── การสื่อสาร ── (ประกาศทุกคน / ส่งเจาะจง / ตอบคำถามคณะ)
   {
     href: '/dashboard/admin/announcements',
     label: 'ประกาศเว็บไซต์',
     Icon: Megaphone,
     matchPrefix: '/dashboard/admin/announcements',
+    section: 'การสื่อสาร',
+  },
+  {
+    href: '/dashboard/admin/messages',
+    label: 'ส่งข้อความถึงผู้ใช้',
+    Icon: Send,
+    matchPrefix: '/dashboard/admin/messages',
+    section: 'การสื่อสาร',
+  },
+  {
+    href: '/dashboard/admin/inbox',
+    label: 'กล่องข้อความคณะ',
+    Icon: Inbox,
+    matchPrefix: '/dashboard/admin/inbox',
+    section: 'การสื่อสาร',
   },
 ];
 
@@ -147,26 +167,38 @@ export function Sidebar({ open, onClose }: Props) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {NAV_ITEMS.filter(
-            (item) => !item.requireRole || (user?.role && item.requireRole.includes(user.role)),
-          ).map((item) => {
-            const active = isActive(item);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  active
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <item.Icon className="h-5 w-5" aria-hidden />
-                <span>{item.label}</span>
-              </Link>
+          {(() => {
+            const visible = NAV_ITEMS.filter(
+              (item) => !item.requireRole || (user?.role && item.requireRole.includes(user.role)),
             );
-          })}
+            let lastSection: string | undefined;
+            return visible.map((item) => {
+              const active = isActive(item);
+              const showHeading = item.section && item.section !== lastSection;
+              lastSection = item.section;
+              return (
+                <div key={item.href}>
+                  {showHeading && (
+                    <p className="mb-1 mt-3 px-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                      {item.section}
+                    </p>
+                  )}
+                  <Link
+                    href={item.href}
+                    onClick={onClose}
+                    className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      active
+                        ? 'bg-indigo-50 text-indigo-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <item.Icon className="h-5 w-5" aria-hidden />
+                    <span>{item.label}</span>
+                  </Link>
+                </div>
+              );
+            });
+          })()}
         </nav>
 
         {user && (
