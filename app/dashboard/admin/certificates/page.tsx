@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Award,
   Ban,
@@ -11,6 +12,7 @@ import {
   ChevronsRight,
   FileText,
   Loader2,
+  ScrollText,
   Search,
   X,
 } from 'lucide-react';
@@ -267,6 +269,14 @@ export default function AdminCertificatesPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         <div className="flex flex-wrap justify-end gap-1.5">
+                          <Link
+                            href={`/dashboard/admin/transcripts/${r.user_id}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            title="ดู / ออกทรานสคริปต์กิจกรรมของนิสิตคนนี้"
+                          >
+                            <ScrollText className="h-3 w-3" aria-hidden />
+                            ทรานสคริปต์
+                          </Link>
                           {r.status === 'REQUESTED' && (
                             <>
                               <button
