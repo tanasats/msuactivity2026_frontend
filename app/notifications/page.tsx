@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Bell, CheckCheck, Loader2, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { useAuthBootstrap } from '@/lib/auth-bootstrap';
 import { formatDateTime } from '@/lib/format';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { AppNotification, NotificationListResponse } from '@/lib/types';
 
 const PAGE_SIZE = 30;
@@ -22,6 +23,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<AppNotification | null>(null);
 
   useEffect(() => {
     if (isBootstrapping) return;
@@ -87,6 +89,15 @@ export default function NotificationsPage() {
     await api.post('/api/me/notifications/read-all').catch(() => {});
   }
 
+  // ลบ notification ส่วนตัว (ประกาศ broadcast ลบไม่ได้) — ยืนยันก่อนลบ
+  function confirmDelete() {
+    const n = pendingDelete;
+    if (!n) return;
+    setItems((prev) => prev.filter((x) => !(x.source === n.source && x.id === n.id)));
+    setPendingDelete(null);
+    api.delete(`/api/me/notifications/${n.id}`).catch(() => {});
+  }
+
   if (isBootstrapping || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -131,13 +142,14 @@ export default function NotificationsPage() {
           <>
             <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
               {items.map((n) => (
-                <li key={`${n.source}-${n.id}`}>
+                <li
+                  key={`${n.source}-${n.id}`}
+                  className={`flex items-stretch ${n.is_read ? '' : 'bg-blue-50/40'}`}
+                >
                   <button
                     type="button"
                     onClick={() => handleClick(n)}
-                    className={`flex w-full gap-3 px-4 py-3 text-left transition hover:bg-gray-50 ${
-                      n.is_read ? '' : 'bg-blue-50/40'
-                    }`}
+                    className="flex flex-1 gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
                   >
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.is_read ? 'bg-transparent' : 'bg-blue-500'}`} aria-hidden />
                     <span className="min-w-0 flex-1">
@@ -151,6 +163,17 @@ export default function NotificationsPage() {
                       <span className="mt-1 block text-[11px] text-gray-400">{formatDateTime(n.created_at)}</span>
                     </span>
                   </button>
+                  {n.source === 'personal' && (
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(n)}
+                      aria-label="ลบการแจ้งเตือนนี้"
+                      title="ลบ"
+                      className="flex shrink-0 items-center px-3 text-gray-300 transition hover:text-rose-500"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -170,6 +193,24 @@ export default function NotificationsPage() {
           </>
         )}
       </section>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        tone="danger"
+        title="ลบการแจ้งเตือน"
+        message={
+          pendingDelete ? (
+            <>
+              ลบ &ldquo;<strong>{pendingDelete.title}</strong>&rdquo; ออกจากรายการ? — ลบแล้วกู้คืนไม่ได้
+            </>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel="ลบ"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </main>
   );
 }

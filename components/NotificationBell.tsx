@@ -36,8 +36,9 @@ export function NotificationBell() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      // กระดิ่งโชว์เฉพาะที่ยังไม่อ่าน — ที่อ่านแล้วดูได้ในหน้า /notifications
       const res = await api.get<NotificationListResponse>('/api/me/notifications', {
-        params: { limit: FETCH_LIMIT },
+        params: { limit: FETCH_LIMIT, unread_only: true },
       });
       setItems(res.data.items);
       setUnread(res.data.unread_count);
@@ -73,12 +74,8 @@ export function NotificationBell() {
 
   async function handleItemClick(n: AppNotification) {
     if (!n.is_read) {
-      // match ด้วย source+id (personal/announcement มี id ชุดแยกกัน อาจซ้ำเลข)
-      setItems((prev) =>
-        prev.map((x) =>
-          x.source === n.source && x.id === n.id ? { ...x, is_read: true } : x,
-        ),
-      );
+      // กระดิ่งโชว์เฉพาะ unread → อ่านแล้วเอาออกจากรายการเลย (match source+id)
+      setItems((prev) => prev.filter((x) => !(x.source === n.source && x.id === n.id)));
       setUnread((c) => Math.max(0, c - 1));
       const url =
         n.source === 'announcement'
@@ -91,7 +88,7 @@ export function NotificationBell() {
   }
 
   async function handleMarkAll() {
-    setItems((prev) => prev.map((x) => ({ ...x, is_read: true })));
+    setItems([]); // กระดิ่ง unread-only → อ่านหมดแล้วรายการว่าง
     setUnread(0);
     try {
       await api.post('/api/me/notifications/read-all');
@@ -139,7 +136,7 @@ export function NotificationBell() {
               </div>
             ) : items.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-gray-500">
-                ยังไม่มีการแจ้งเตือน
+                ไม่มีการแจ้งเตือนใหม่
               </p>
             ) : (
               <ul className="divide-y divide-gray-50">
