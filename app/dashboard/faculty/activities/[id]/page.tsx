@@ -115,11 +115,11 @@ export default function FacultyActivityDetailPage() {
       );
       setActivity(res.data);
       setShowCompleteConfirm(false);
-      toast.success('ปิดโครงการเรียบร้อย');
+      toast.success('เสร็จสิ้นโครงการเรียบร้อย');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setShowCompleteConfirm(false);
-      toast.error(err.response?.data?.message ?? 'ปิดโครงการไม่สำเร็จ');
+      toast.error(err.response?.data?.message ?? 'ทำเครื่องหมายเสร็จสิ้นไม่สำเร็จ');
     } finally {
       setCompleting(false);
     }
@@ -210,7 +210,7 @@ export default function FacultyActivityDetailPage() {
               </Link>
             </>
           )}
-          {/* ปิดโครงการ — เฉพาะผู้สร้าง + status WORK */}
+          {/* เสร็จสิ้นโครงการ (WORK → COMPLETED) — เฉพาะผู้สร้าง + status WORK */}
           {activity.is_mine && activity.status === 'WORK' && (
             <button
               type="button"
@@ -219,7 +219,7 @@ export default function FacultyActivityDetailPage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 shadow-sm hover:bg-amber-100 disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" aria-hidden />
-              ปิดโครงการ
+              เสร็จสิ้นโครงการ
             </button>
           )}
           {!activity.can_edit && !activity.can_edit_limited && activity.is_mine && (
@@ -327,7 +327,7 @@ export default function FacultyActivityDetailPage() {
       <ConfirmDialog
         open={showCompleteConfirm}
         tone="danger"
-        title="ปิดโครงการนี้?"
+        title="ทำเครื่องหมายเสร็จสิ้นโครงการนี้?"
         message={
           <div className="space-y-2">
             <p>
@@ -335,19 +335,19 @@ export default function FacultyActivityDetailPage() {
               <strong>เสร็จสิ้น (COMPLETED)</strong>
             </p>
             <ul className="ml-4 list-disc text-xs text-gray-600">
-              <li>หลังปิดจะ <strong>เพิ่ม/ลบรูปประกอบไม่ได้</strong></li>
+              <li>หลังเสร็จสิ้นจะ <strong>เพิ่ม/ลบรูปประกอบไม่ได้</strong></li>
               <li>การลงทะเบียน + check-in จะถูกหยุดทันที</li>
-              <li>ถ้าต้องเปิดกลับมา ต้องผ่าน super_admin</li>
+              <li>ถ้าต้องกลับมาแก้ไข ต้องผ่าน super_admin</li>
             </ul>
             {new Date(activity.end_at).getTime() > Date.now() && (
               <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
                 ⚠️ กิจกรรมยังไม่สิ้นสุดตามกำหนด ({formatDateTime(activity.end_at)}) —
-                แน่ใจหรือไม่ว่าต้องการปิดก่อนเวลา?
+                แน่ใจหรือไม่ว่าต้องการปิดเป็นเสร็จสิ้นก่อนเวลา?
               </p>
             )}
           </div>
         }
-        confirmLabel="ปิดโครงการ"
+        confirmLabel="เสร็จสิ้นโครงการ"
         cancelLabel="ยกเลิก"
         loading={completing}
         onConfirm={executeComplete}

@@ -1529,7 +1529,7 @@ const AUDIT_ACTION_LABEL: Record<ActivityAuditEntry['action'], { text: string; t
   reject: { text: 'ไม่อนุมัติ', tone: 'bg-rose-50 text-rose-700' },
   set_status: { text: 'override สถานะ', tone: 'bg-violet-50 text-violet-700' },
   set_creator: { text: 'เปลี่ยนผู้สร้าง', tone: 'bg-violet-50 text-violet-700' },
-  complete: { text: 'ปิดโครงการ', tone: 'bg-emerald-50 text-emerald-700' },
+  complete: { text: 'เสร็จสิ้นโครงการ', tone: 'bg-emerald-50 text-emerald-700' },
   edit_admin: { text: 'admin แก้ไขฟิลด์', tone: 'bg-indigo-50 text-indigo-700' },
   bulk_approve: { text: 'อนุมัติกลุ่ม', tone: 'bg-emerald-50 text-emerald-700' },
   bulk_reject: { text: 'ไม่อนุมัติกลุ่ม', tone: 'bg-rose-50 text-rose-700' },
