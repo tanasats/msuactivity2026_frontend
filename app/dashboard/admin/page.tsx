@@ -69,21 +69,17 @@ export default function AdminOverviewPage() {
   const [academicYear, setAcademicYear] = useState<number | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
 
+  // โหลดรายการปี (เฉพาะ dropdown) — default ของหน้าคือ "ทุกปีการศึกษา" (academicYear = null)
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get<AcademicYearsResponse>(
-          '/api/admin/academic-years',
-        );
+        const res = await api.get<AcademicYearsResponse>('/api/admin/academic-years');
         if (cancelled) return;
         setAvailableYears(res.data.available);
-        setAcademicYear(res.data.default_year ?? res.data.current);
-      } catch (e: unknown) {
-        if (cancelled) return;
-        const err = e as { response?: { data?: { message?: string } } };
-        setError(err.response?.data?.message ?? 'โหลดข้อมูลปีไม่สำเร็จ');
+      } catch {
+        /* dropdown ปีโหลดไม่ได้ ก็ยังใช้ "ทุกปีการศึกษา" ได้ */
       }
     })();
     return () => {
@@ -91,16 +87,17 @@ export default function AdminOverviewPage() {
     };
   }, [user]);
 
+  // สถิติ + รายการรออนุมัติ = เปลี่ยนตามปีที่เลือก (academicYear = null → ทุกปี ไม่ส่ง param)
   useEffect(() => {
-    if (!user || academicYear === null) return;
+    if (!user) return;
     let cancelled = false;
     (async () => {
       try {
-        const yearParam = `academic_year=${academicYear}`;
+        const yearParam = academicYear !== null ? `academic_year=${academicYear}` : '';
         const [statsRes, pendingRes] = await Promise.all([
-          api.get<AdminStats>(`/api/admin/stats?${yearParam}`),
+          api.get<AdminStats>(`/api/admin/stats${yearParam ? `?${yearParam}` : ''}`),
           api.get<{ items: AdminActivitySummary[]; total: number }>(
-            `/api/admin/activities?status=PENDING_APPROVAL&limit=5&${yearParam}`,
+            `/api/admin/activities?status=PENDING_APPROVAL&limit=5${yearParam ? `&${yearParam}` : ''}`,
           ),
         ]);
         if (cancelled) return;
@@ -124,12 +121,10 @@ export default function AdminOverviewPage() {
         <div>
           <h1 className="mb-1 text-2xl font-bold text-gray-900">ภาพรวมระบบ</h1>
           <p className="text-sm text-gray-500">
-            สถิติกิจกรรมทุกคณะ + รายการที่รออนุมัติ
-            {academicYear !== null && (
-              <span className="ml-1.5 text-gray-400">
-                · ปีการศึกษา {academicYear}
-              </span>
-            )}
+            สถิติกิจกรรมทุกคณะ + รายการรออนุมัติ
+            <span className="ml-1.5 text-gray-400">
+              · {academicYear !== null ? `ปีการศึกษา ${academicYear}` : 'ทุกปีการศึกษา'}
+            </span>
           </p>
         </div>
 
@@ -137,15 +132,14 @@ export default function AdminOverviewPage() {
           <Calendar className="h-4 w-4 text-gray-400" aria-hidden />
           <span className="text-gray-600">ปีการศึกษา</span>
           <select
-            value={academicYear ?? ''}
-            onChange={(e) => setAcademicYear(Number(e.target.value))}
-            disabled={availableYears.length === 0}
+            value={academicYear ?? 'ALL'}
+            onChange={(e) =>
+              setAcademicYear(e.target.value === 'ALL' ? null : Number(e.target.value))
+            }
             className="bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
             aria-label="เลือกปีการศึกษา"
           >
-            {availableYears.length === 0 && academicYear !== null && (
-              <option value={academicYear}>{academicYear}</option>
-            )}
+            <option value="ALL">ทุกปีการศึกษา</option>
             {availableYears.map((y) => (
               <option key={y} value={y}>
                 {y}
@@ -164,7 +158,7 @@ export default function AdminOverviewPage() {
       {/* Stats grid — 1 card รวม + 4 cards ตาม status */}
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">
-          สถิติกิจกรรม (ทุกคณะ)
+          สถิติกิจกรรม (ทุกคณะ · {academicYear !== null ? `ปีการศึกษา ${academicYear}` : 'ทุกปีการศึกษา'})
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <TotalCard
@@ -199,7 +193,7 @@ export default function AdminOverviewPage() {
             รออนุมัติล่าสุด
           </h2>
           <Link
-            href="/dashboard/admin/activities?status=PENDING_APPROVAL"
+            href={`/dashboard/admin/activities?status=PENDING_APPROVAL&academic_year=${academicYear ?? 'all'}`}
             className="text-sm text-indigo-600 hover:underline"
           >
             ดูทั้งหมด →
@@ -210,7 +204,8 @@ export default function AdminOverviewPage() {
 
         {pendingItems && pendingItems.length === 0 && (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
-            ไม่มีกิจกรรมที่รออนุมัติในปีการศึกษานี้
+            ไม่มีกิจกรรมที่รออนุมัติ
+            {academicYear !== null ? ` ในปีการศึกษา ${academicYear}` : ''}
           </div>
         )}
 
@@ -264,12 +259,11 @@ function TotalCard({
   value: number | null;
   academicYear: number | null;
 }) {
-  const params = new URLSearchParams();
-  if (academicYear !== null) params.set('academic_year', String(academicYear));
-  const href =
-    params.toString() === ''
-      ? '/dashboard/admin/activities'
-      : `/dashboard/admin/activities?${params.toString()}`;
+  // academicYear=null (ทุกปี) → ส่ง academic_year=all ให้ชัด (ไม่งั้นหน้า activities จะ auto-fill เป็นปีปัจจุบัน)
+  const params = new URLSearchParams({
+    academic_year: academicYear !== null ? String(academicYear) : 'all',
+  });
+  const href = `/dashboard/admin/activities?${params.toString()}`;
   return (
     <Link
       href={href}
@@ -306,7 +300,8 @@ function StatusCard({
   academicYear: number | null;
 }) {
   const params = new URLSearchParams({ status });
-  if (academicYear !== null) params.set('academic_year', String(academicYear));
+  // ทุกปี → academic_year=all (กันหน้าปลายทาง default เป็นปีปัจจุบัน)
+  params.set('academic_year', academicYear !== null ? String(academicYear) : 'all');
   return (
     <Link
       href={`/dashboard/admin/activities?${params.toString()}`}
