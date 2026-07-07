@@ -680,7 +680,7 @@ export function ActivityForm({
         </Field>
         <fieldset disabled={isLimited} className="contents">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="หน่วยงานเจ้าของ" required>
+            <Field label="องค์กรเจ้าของ" required>
               <select
                 value={value.organization_id ?? ''}
                 onChange={(e) =>
