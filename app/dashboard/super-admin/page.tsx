@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Building2,
+  Calendar,
   CheckCircle2,
   ClipboardList,
   FileEdit,
   GraduationCap,
   HourglassIcon,
   Tag,
+  UserCheck,
   Users,
   Wrench,
   type LucideIcon,
@@ -25,6 +27,12 @@ import type {
   PublicStats,
 } from '@/lib/types';
 
+interface AcademicYearsResponse {
+  current: number;
+  default_year: number;
+  available: number[];
+}
+
 export default function SuperAdminOverviewPage() {
   const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
@@ -34,22 +42,23 @@ export default function SuperAdminOverviewPage() {
   const [facCounts, setFacCounts] = useState<{ total: number; active: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // default = "ทุกปีการศึกษา" (null)
+  const [academicYear, setAcademicYear] = useState<number | null>(null);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+
+  // โหลดครั้งเดียว — master data + รายการปี (ไม่ผูกกับปีที่เลือก)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // ดึงพร้อมกัน — public stats + admin stats (ทุกปี = ไม่ส่ง academic_year) + master data counts
-        const [pubRes, admRes, orgsRes, catsRes, skillsRes, facsRes] = await Promise.all([
-          api.get<PublicStats>('/api/public/stats'),
-          api.get<AdminStats>('/api/admin/stats'),
+        const [orgsRes, catsRes, skillsRes, facsRes, yearsRes] = await Promise.all([
           api.get<{ items: MasterOrganization[] }>('/api/organizations'),
           api.get<{ items: MasterCategory[] }>('/api/categories'),
           api.get<{ items: MasterSkill[] }>('/api/skills'),
           api.get<{ items: MasterFaculty[] }>('/api/faculties'),
+          api.get<AcademicYearsResponse>('/api/admin/academic-years'),
         ]);
         if (cancelled) return;
-        setPublicStats(pubRes.data);
-        setAdminStats(admRes.data);
         const orgs = orgsRes.data.items;
         const cats = catsRes.data.items;
         const skills = skillsRes.data.items;
@@ -58,6 +67,7 @@ export default function SuperAdminOverviewPage() {
         setCatCounts({ total: cats.length, active: cats.filter((c) => c.is_active).length });
         setSkillCounts({ total: skills.length, active: skills.filter((s) => s.is_active).length });
         setFacCounts({ total: facs.length, active: facs.filter((f) => f.is_active).length });
+        setAvailableYears(yearsRes.data.available);
       } catch (e: unknown) {
         if (cancelled) return;
         const err = e as { response?: { data?: { message?: string } } };
@@ -69,15 +79,64 @@ export default function SuperAdminOverviewPage() {
     };
   }, []);
 
-  const pendingApproval = adminStats?.counts?.PENDING_APPROVAL ?? null;
+  // สถิติที่เปลี่ยนตามปี — public stats + admin stats (null = ทุกปี ไม่ส่ง param)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const yp = academicYear !== null ? `academic_year=${academicYear}` : '';
+        const [pubRes, admRes] = await Promise.all([
+          api.get<PublicStats>(`/api/public/stats${yp ? `?${yp}` : ''}`),
+          api.get<AdminStats>(`/api/admin/stats${yp ? `?${yp}` : ''}`),
+        ]);
+        if (cancelled) return;
+        setPublicStats(pubRes.data);
+        setAdminStats(admRes.data);
+        setError(null);
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const err = e as { response?: { data?: { message?: string } } };
+        setError(err.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [academicYear]);
+
+  const yearLabel = academicYear !== null ? `ปีการศึกษา ${academicYear}` : 'ทุกปีการศึกษา';
+  const yearQuery = `academic_year=${academicYear ?? 'all'}`;
 
   return (
     <div className="mx-auto max-w-full p-6 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">ภาพรวมระบบ</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          สถิติทั่วทั้งระบบ + เข้าถึง master data + งาน admin
-        </p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">ภาพรวมระบบ</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            สถิติทั่วทั้งระบบ + เข้าถึง master data
+            <span className="ml-1.5 text-gray-400">· {yearLabel}</span>
+          </p>
+        </div>
+
+        <label className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm">
+          <Calendar className="h-4 w-4 text-gray-400" aria-hidden />
+          <span className="text-gray-600">ปีการศึกษา</span>
+          <select
+            value={academicYear ?? 'ALL'}
+            onChange={(e) =>
+              setAcademicYear(e.target.value === 'ALL' ? null : Number(e.target.value))
+            }
+            className="bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
+            aria-label="เลือกปีการศึกษา"
+          >
+            <option value="ALL">ทุกปีการศึกษา</option>
+            {availableYears.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {error && (
@@ -90,41 +149,32 @@ export default function SuperAdminOverviewPage() {
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">
           ระบบโดยรวม{' '}
-          {publicStats && (
-            <span className="ml-1 text-xs font-normal text-gray-400">
-              ปีการศึกษา {publicStats.academic_year}
-            </span>
-          )}
+          <span className="ml-1 text-xs font-normal text-gray-400">{yearLabel}</span>
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile
-            label="กิจกรรมในปีนี้"
+            label="กิจกรรม"
             value={publicStats?.activities_count ?? null}
             Icon={ClipboardList}
             tone="blue"
           />
           <Tile
-            label="การลงทะเบียน"
+            label="การลงทะเบียน (ครั้ง)"
             value={publicStats?.registrations_count ?? null}
             Icon={CheckCircle2}
             tone="emerald"
           />
           <Tile
-            label="สมาชิกในระบบ"
+            label="นิสิตที่เข้าร่วม (คน)"
+            value={publicStats?.participants_count ?? null}
+            Icon={UserCheck}
+            tone="amber"
+          />
+          <Tile
+            label="สมาชิกในระบบ (ทั้งหมด)"
             value={publicStats?.members_count ?? null}
             Icon={Users}
             tone="violet"
-          />
-          <Tile
-            label="รออนุมัติ"
-            value={pendingApproval}
-            Icon={HourglassIcon}
-            tone="amber"
-            href={
-              pendingApproval && pendingApproval > 0
-                ? '/dashboard/admin/activities?status=PENDING_APPROVAL'
-                : undefined
-            }
           />
         </div>
       </section>
@@ -132,7 +182,8 @@ export default function SuperAdminOverviewPage() {
       {/* แถว 2 — กิจกรรมแยกตามสถานะ (ทุกปี รวม) */}
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">
-          กิจกรรมแยกตามสถานะ (ทุกปีการศึกษา)
+          กิจกรรมแยกตามสถานะ{' '}
+          <span className="ml-1 text-xs font-normal text-gray-400">{yearLabel}</span>
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile
@@ -140,28 +191,28 @@ export default function SuperAdminOverviewPage() {
             value={adminStats?.counts?.DRAFT ?? null}
             Icon={FileEdit}
             tone="gray"
-            href="/dashboard/admin/activities?status=DRAFT"
+            href={`/dashboard/admin/activities?status=DRAFT&${yearQuery}`}
           />
           <Tile
             label="รออนุมัติ"
             value={adminStats?.counts?.PENDING_APPROVAL ?? null}
             Icon={HourglassIcon}
             tone="amber"
-            href="/dashboard/admin/activities?status=PENDING_APPROVAL"
+            href={`/dashboard/admin/activities?status=PENDING_APPROVAL&${yearQuery}`}
           />
           <Tile
             label="ดำเนินการ"
             value={adminStats?.counts?.WORK ?? null}
             Icon={ClipboardList}
             tone="emerald"
-            href="/dashboard/admin/activities?status=WORK"
+            href={`/dashboard/admin/activities?status=WORK&${yearQuery}`}
           />
           <Tile
             label="เสร็จสิ้น"
             value={adminStats?.counts?.COMPLETED ?? null}
             Icon={CheckCircle2}
             tone="slate"
-            href="/dashboard/admin/activities?status=COMPLETED"
+            href={`/dashboard/admin/activities?status=COMPLETED&${yearQuery}`}
           />
         </div>
       </section>

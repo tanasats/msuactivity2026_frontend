@@ -466,9 +466,10 @@ export interface UserAuditLog {
 // ── public landing types ─────────────────────────────────────────
 
 export interface PublicStats {
-  academic_year: number;
+  academic_year: number | null;   // null = ทุกปีการศึกษา
   activities_count: number;       // กิจกรรมทั้งหมดในปีการศึกษาปัจจุบัน
   registrations_count: number;    // ผู้ลงทะเบียน (นับ row — 1 นิสิต × 3 กิจกรรม = 3)
+  participants_count: number;     // นิสิตที่เข้าร่วม (นับหัวไม่ซ้ำ)
   members_count: number;          // สมาชิกใน users (status=active)
 }
 
